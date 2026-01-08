@@ -1,8 +1,15 @@
-# VoiceCast
+<p align="center">
+  <img src="./logo.svg" alt="VoiceCast Logo" width="400">
+</p>
 
-*Your words, any voice.*
+<p align="center">
+  <em>Your words, any voice.</em>
+</p>
 
-Voice cloning and text-to-speech with multiple TTS engines. Clone any voice from a short audio sample and generate speech in that voice.
+<p align="center">
+  Voice cloning and text-to-speech with multiple TTS engines.<br>
+  Clone any voice from a short audio sample and generate speech in that voice.
+</p>
 
 ![VoiceCast GUI](./voicecast-app.png)
 
