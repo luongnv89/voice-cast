@@ -50,14 +50,24 @@ class VoiceCloner:
         """
         self.speaker_wav = speaker_wav
 
-        # Ensure the speaker reference file exists
-        if not os.path.exists(self.speaker_wav):
-            logger.error(f"Speaker reference file not found: {self.speaker_wav}")
-            raise FileNotFoundError(f"Speaker reference file not found: {self.speaker_wav}")
-
         # Create or use provided engine
         if engine is None:
             engine = "coqui"
+
+        # Determine if this engine requires a speaker reference file
+        requires_voice = True
+        if isinstance(engine, str):
+            try:
+                metadata = TTSFactory.get_engine_metadata(engine)
+                requires_voice = metadata.get("requires_reference_audio", True)
+            except ValueError:
+                pass  # Unknown engine, assume it needs voice file
+
+        # Ensure the speaker reference file exists if required
+        if requires_voice and self.speaker_wav:
+            if not os.path.exists(self.speaker_wav):
+                logger.error(f"Speaker reference file not found: {self.speaker_wav}")
+                raise FileNotFoundError(f"Speaker reference file not found: {self.speaker_wav}")
 
         if isinstance(engine, str):
             self.engine = TTSFactory.create(engine_name=engine, speaker_wav=speaker_wav, device=device, **engine_kwargs)

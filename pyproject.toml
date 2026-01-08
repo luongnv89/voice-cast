@@ -9,6 +9,7 @@ dependencies = [
     "torch>=2.5.1",
     "torchaudio>=2.5.1",
     "TTS>=0.22.0",
+    "chatterbox-tts>=0.1.0",
     "sounddevice>=0.5.1",
     "soundfile>=0.13.0",
     "PySide6>=6.4.0",
@@ -18,8 +19,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-chatterbox = [
-    "chatterbox-tts>=0.1.0",
+mlx = [
+    "mlx>=0.21.0; platform_machine == 'arm64' and sys_platform == 'darwin'",
+    "mlx-audio>=0.1.0; platform_machine == 'arm64' and sys_platform == 'darwin'",
 ]
 dev = [
     "pytest>=8.0.0",
