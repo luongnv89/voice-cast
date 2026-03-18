@@ -1,10 +1,10 @@
-# VoiceCloner Documentation
+# VoiceCast Documentation
 
-Welcome to the VoiceCloner documentation. This guide covers everything from basic usage to extending the system with custom TTS engines.
+Welcome to the VoiceCast documentation. This guide covers everything from basic usage to extending the system with custom TTS engines.
 
 ## Getting Started
 
-If you're new to VoiceCloner, start here:
+If you're new to VoiceCast, start here:
 
 1. **[Quick Start](../README.md)** - Installation and basic usage
 2. **[GUI Guide](gui-guide.md)** - Desktop application walkthrough
@@ -65,4 +65,4 @@ graph LR
 
 ## Version
 
-This documentation is for VoiceCloner v0.2.0.
+This documentation is for VoiceCast v0.2.0.
