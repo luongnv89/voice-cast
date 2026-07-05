@@ -4,9 +4,9 @@ import pytest
 
 pytest.importorskip("PySide6")
 
-from PySide6.QtCore import QCoreApplication
+from PySide6.QtCore import QCoreApplication  # noqa: E402
 
-from gui.engine_controls import (
+from gui.engine_controls import (  # noqa: E402
     ChatterboxControls,
     CoquiControls,
     EngineControlsBase,
