@@ -74,7 +74,7 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest tests/ -v --tb=short || echo "Tests skipped - ML models not available in CI"
+          pytest tests/ -v --tb=short
 
   pre-commit:
     name: Pre-commit Hooks
