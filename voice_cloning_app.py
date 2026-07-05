@@ -351,14 +351,7 @@ class VoiceCloningApp(QMainWindow):
 
     def _get_model_id_for_engine(self, engine_name: str) -> str:
         """Get the model ID for an engine name."""
-        model_map = {
-            "coqui": "coqui-xtts-v2",
-            "chatterbox-turbo": "chatterbox-turbo",
-            "chatterbox-standard": "chatterbox-standard",
-            "mlx-kokoro": "mlx-kokoro",
-            "mlx-csm": "mlx-csm",
-        }
-        return model_map.get(engine_name, engine_name)
+        return self._registry.get_model_id_for_engine(engine_name)
 
     def start_cloning(self):
         """Start the voice cloning process."""

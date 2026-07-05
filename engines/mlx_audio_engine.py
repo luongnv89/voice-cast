@@ -116,7 +116,7 @@ class MlxAudioEngine(TTSEngineBase):
         speaker_wav: str,
         device: str | None = None,
         variant: MlxVariant = "kokoro",
-        auto_download: bool = True,
+        auto_download: bool = False,
     ):
         """
         Initialize MLX Audio TTS engine.
@@ -125,7 +125,9 @@ class MlxAudioEngine(TTSEngineBase):
             speaker_wav: Path to speaker reference audio (required for CSM, ignored for Kokoro).
             device: Device to use (defaults to "mps" on Apple Silicon).
             variant: "kokoro" (preset voices) or "csm" (voice cloning).
-            auto_download: If True, automatically download model if not installed.
+            auto_download: If True, allow the backend to download a missing model.
+                          Defaults to False so generation never downloads models
+                          unless the caller explicitly opts in.
 
         Raises:
             RuntimeError: If not running on Apple Silicon.
@@ -165,7 +167,7 @@ class MlxAudioEngine(TTSEngineBase):
                         engine="mlx-audio",
                         install_command=f"python vcloner.py --download-models {self._model_id}",
                     )
-                logger.info(f"Model {self._model_id} not found, will download on first use...")
+                logger.info(f"Model {self._model_id} not found; auto_download=True so backend download is allowed...")
 
             logger.info(f"Loading MLX Audio {self.variant} model...")
             try:

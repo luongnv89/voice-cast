@@ -1,10 +1,10 @@
 import os
 
-import numpy as np
 import pytest
-import soundfile as sf
 
-from voice_cloner import VoiceCloner
+np = pytest.importorskip("numpy")
+sf = pytest.importorskip("soundfile")
+VoiceCloner = pytest.importorskip("voice_cloner").VoiceCloner
 
 
 # Fixture for the VoiceCloner instance

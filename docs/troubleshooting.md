@@ -90,22 +90,31 @@ pip install --force-reinstall PySide6
 
 ## Runtime Issues
 
-### Model Download Timeout
+### Model Not Installed or Download Timeout
 
 **Symptoms:**
 ```
+ModelNotInstalledError: Model 'coqui-xtts-v2' for engine 'coqui' is not installed.
 TimeoutError: Connection timed out while downloading model
 ```
 
 **Solutions:**
 
-1. **Retry**: Models are cached after first download
-2. **Check internet connection**
-3. **Set longer timeout:**
+1. **List model status:**
    ```bash
-   HF_HUB_DOWNLOAD_TIMEOUT=300 python voice_cloning_app.py
+   python vcloner.py --list-models
    ```
-4. **Manual download**: Models are stored in `~/.cache/huggingface/`
+2. **Download explicitly:**
+   ```bash
+   python vcloner.py --download-models coqui-xtts-v2
+   python vcloner.py --download-models --engine chatterbox
+   ```
+3. **Check internet connection**
+4. **Set longer timeout for Hugging Face downloads:**
+   ```bash
+   HF_HUB_DOWNLOAD_TIMEOUT=300 python vcloner.py --download-models chatterbox-turbo
+   ```
+5. **Check cache location**: Chatterbox and MLX models are stored in `~/.cache/huggingface/hub` by default.
 
 ### Out of Memory (GPU)
 
@@ -419,11 +428,11 @@ NO_COLOR=1 python vcloner.py ...
 
 ### Slow First Run
 
-**Expected behavior**: First run downloads models (1-2 GB) and caches them. Subsequent runs are faster.
+**Expected behavior**: Installation and generation do not download models automatically. Explicit model downloads can be large (500 MB-2 GB), and cached models make later generation faster.
 
 **Speed up:**
-- Use wired internet connection
-- Pre-download models with `VoiceCloner(speaker_wav="speaker.wav")` before actual use
+- Use wired internet connection for explicit downloads
+- Pre-download models with `python vcloner.py --download-models <model-id>`
 
 ### Slow Generation
 

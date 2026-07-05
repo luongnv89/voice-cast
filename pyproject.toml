@@ -40,7 +40,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["engines*", "gui*"]
+include = ["engines*", "gui*", "models*", "utils*"]
 
 # Ruff configuration (fast Python linter and formatter)
 [tool.ruff]
@@ -76,7 +76,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["engines", "gui"]
+known-first-party = ["engines", "gui", "models", "utils"]
 
 [tool.ruff.format]
 quote-style = "double"

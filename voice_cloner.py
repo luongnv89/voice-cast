@@ -9,6 +9,8 @@ from rich.console import Console
 from rich.logging import RichHandler
 from transformers import logging as transformers_logging
 
+from models import ModelDownloader, ModelInfo, ModelRegistry
+from models.download_progress import ProgressCallback
 from tts_engine_base import TTSEngineBase
 from tts_factory import TTSFactory
 
@@ -36,7 +38,12 @@ class VoiceCloner:
     """
 
     def __init__(
-        self, speaker_wav: str, engine: str | TTSEngineBase | None = None, device: str | None = None, **engine_kwargs
+        self,
+        speaker_wav: str,
+        engine: str | TTSEngineBase | None = None,
+        device: str | None = None,
+        auto_download: bool = False,
+        **engine_kwargs,
     ):
         """
         Initialize the VoiceCloner.
@@ -46,9 +53,13 @@ class VoiceCloner:
             engine: Either an engine name (str) or a TTSEngineBase instance.
                    Defaults to "coqui" if not specified.
             device: Device to use ("cuda" or "cpu"). Auto-detected if None.
+            auto_download: Explicit opt-in for backend model downloads. Defaults
+                to False so model files are never downloaded during generation.
             **engine_kwargs: Additional parameters passed to engine constructor.
         """
         self.speaker_wav = speaker_wav
+        self.device = device
+        self.auto_download = auto_download
 
         # Create or use provided engine
         if engine is None:
@@ -70,6 +81,7 @@ class VoiceCloner:
                 raise FileNotFoundError(f"Speaker reference file not found: {self.speaker_wav}")
 
         if isinstance(engine, str):
+            engine_kwargs.setdefault("auto_download", auto_download)
             self.engine = TTSFactory.create(engine_name=engine, speaker_wav=speaker_wav, device=device, **engine_kwargs)
             self.engine_name = engine
         else:
@@ -194,3 +206,35 @@ class VoiceCloner:
     def available_engines():
         """Get list of available TTS engines."""
         return TTSFactory.get_engine_info()
+
+    @staticmethod
+    def list_models() -> list[ModelInfo]:
+        """List available models with current cache status."""
+        return ModelRegistry().list_models()
+
+    @staticmethod
+    def is_model_installed(model_id: str) -> bool:
+        """Return whether a model is present in the local cache."""
+        return ModelRegistry().is_installed(model_id)
+
+    @staticmethod
+    def download_model(model_id: str, progress_callback: ProgressCallback | None = None):
+        """Explicitly download a model and return its local path."""
+        return ModelDownloader().download(model_id, progress_callback=progress_callback)
+
+    @staticmethod
+    def get_model_id_for_engine(engine_name: str) -> str:
+        """Return the default model ID for a public engine name."""
+        return ModelRegistry().get_model_id_for_engine(engine_name)
+
+    def switch_engine(self, engine: str, **engine_kwargs) -> None:
+        """Switch this cloner to another engine/model without implicit downloads."""
+        engine_kwargs.setdefault("auto_download", self.auto_download)
+        self.engine = TTSFactory.create(
+            engine_name=engine,
+            speaker_wav=self.speaker_wav,
+            device=self.device,
+            **engine_kwargs,
+        )
+        self.engine_name = engine
+        logger.info(f"VoiceCloner switched to engine: {self.engine.name}")

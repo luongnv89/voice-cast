@@ -12,6 +12,8 @@
 
 <h1 align="center">Clone Any Voice from a 5-Second Clip</h1>
 
+<p align="center"><strong>Your words, any voice.</strong></p>
+
 <p align="center">
   VoiceCast turns a short audio sample into a voice you can use for text-to-speech — in 16 languages,<br>
   with expressive emotions, through a desktop app, command line, or Python API.
@@ -47,10 +49,11 @@ VoiceCast solves all three. Record 5–30 seconds of any voice, and generate nat
 
 ## How It Works
 
-1. **Install** — Clone the repo, create a virtual environment, and `pip install -e .` — that's it.
-2. **Pick a voice sample** — Any clean 5–30 second audio clip of the voice you want to clone.
-3. **Choose your engine** — Coqui XTTS v2 for multilingual quality, or Chatterbox for speed and expressiveness.
-4. **Generate speech** — Type your text, hit generate, and get a WAV file in the cloned voice.
+1. **Install** — Clone the repo, create a virtual environment, and `pip install -e .`.
+2. **Download a model intentionally** — VoiceCast does not download models during install or first generation; use the CLI or GUI Model Manager to fetch only what you need.
+3. **Pick a voice sample** — Any clean 5–30 second audio clip of the voice you want to clone.
+4. **Choose your engine** — Coqui XTTS v2 for multilingual quality, or Chatterbox for speed and expressiveness.
+5. **Generate speech** — Type your text, hit generate, and get a WAV file in the cloned voice.
 
 | Engine | Languages | Speed | Best For |
 |--------|-----------|-------|----------|
@@ -73,14 +76,20 @@ cd voicecast
 python3.10 -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-# Install
+# Install code and dependencies only; models are downloaded separately
 pip install -e .
+
+# See model cache status, then download only what you need
+python vcloner.py --list-models
+python vcloner.py --download-models coqui-xtts-v2
 ```
 
 **Launch the GUI:**
 ```bash
 python voice_cloning_app.py
 ```
+
+Use the **Model Manager** tab to download models before generating.
 
 **Or use the CLI:**
 ```bash
@@ -90,6 +99,9 @@ python vcloner.py -i voice.wav -t "Hello world" -o output.wav
 **Or call the Python API:**
 ```python
 from voice_cloner import VoiceCloner
+
+# Explicit model download; normal generation never downloads implicitly.
+VoiceCloner.download_model("coqui-xtts-v2")
 
 cloner = VoiceCloner(speaker_wav="./voice-samples/speaker.wav")
 cloner.say("Hello, this is my cloned voice!", save_audio=True, output_file="output.wav")
@@ -106,6 +118,9 @@ Supported tags: `[laugh]`, `[chuckle]`, `[cough]`, `[sigh]`, `[gasp]`, `[yawn]`
 
 **Is VoiceCast free?**
 Yes. VoiceCast is MIT licensed — free for personal and commercial use, forever. See [LICENSE](LICENSE).
+
+**Does it download models automatically?**
+No. Install and initialization do not download model files. Run `python vcloner.py --list-models`, `python vcloner.py --download-models <model-id>`, or use the GUI Model Manager to manage local models.
 
 **Does it need a GPU?**
 No. VoiceCast runs on CPU. An NVIDIA GPU with CUDA speeds up generation significantly, and Apple Silicon users can install the optional MLX backend for hardware acceleration.
@@ -144,6 +159,7 @@ MIT licensed. Runs locally. Works on Linux, macOS, and Windows.
 | [CLI Reference](docs/cli-reference.md) | Command-line interface guide |
 | [GUI Guide](docs/gui-guide.md) | Desktop application user manual |
 | [Engines Guide](docs/engines.md) | TTS engine comparison and parameters |
+| [Model Management](docs/model-management.md) | Explicit model download, cache, CLI, GUI, and API workflow |
 | [Architecture](docs/architecture.md) | System design and patterns |
 | [Development](docs/development.md) | Contributing and setup guide |
 | [Troubleshooting](docs/troubleshooting.md) | Common issues and solutions |

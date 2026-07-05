@@ -17,6 +17,8 @@ graph TB
     subgraph "Core Layer"
         VC[VoiceCloner Class]
         TF[TTSFactory]
+        MR[ModelRegistry]
+        MD[ModelDownloader]
     end
 
     subgraph "Engine Layer"
@@ -36,6 +38,9 @@ graph TB
     CLI --> VC
     API --> VC
     VC --> TF
+    GUI --> MR
+    CLI --> MR
+    CLI --> MD
     TF --> BASE
     BASE --> COQUI
     BASE --> CHAT
@@ -64,6 +69,7 @@ graph TB
 #### Python API (`voice_cloner.py`)
 - Primary programmatic interface
 - Factory methods: `from_coqui()`, `from_chatterbox()`
+- Model-management helpers: `list_models()`, `download_model()`, `is_model_installed()`, `switch_engine()`
 - Audio playback and file saving built-in
 
 ### Core Layer
@@ -87,6 +93,15 @@ classDiagram
         +from_chatterbox(speaker_wav, variant, device): VoiceCloner
     }
 ```
+
+#### ModelRegistry and ModelDownloader
+
+Model management is explicit and separate from generation:
+
+- `ModelRegistry` stores model metadata, provider/engine mapping, cache locations, and installation status.
+- `ModelDownloader` routes explicit downloads to provider-specific adapters.
+- Engines check model availability before lazy loading and raise `ModelNotInstalledError` when a model is missing.
+- Normal install, API initialization, CLI generation, and GUI generation do not download model files implicitly.
 
 #### TTSFactory
 
@@ -159,9 +174,10 @@ The `TTSFactory` class implements the Factory pattern for engine creation:
 - Common functionality (device detection) in base class
 - Subclasses customize generation logic
 
-### Lazy Loading
+### Explicit Model Management + Lazy Loading
 
-Both engines use lazy model loading:
+Models are downloaded only through explicit model-management commands/API calls.
+Engines still use lazy loading to avoid loading large model weights until first use:
 
 ```python
 @property
@@ -172,7 +188,7 @@ def model(self):
     return self._model
 ```
 
-This reduces startup time and memory usage when engines aren't used.
+This reduces startup time and memory usage when engines aren't used while keeping network downloads user-controlled.
 
 ## Data Flow
 
@@ -239,7 +255,12 @@ voicecast/
 │   └── chatterbox_engine.py # Chatterbox engine
 ├── gui/
 │   ├── __init__.py
-│   └── engine_controls.py   # Dynamic UI controls
+│   ├── engine_controls.py   # Dynamic UI controls
+│   └── model_manager_widget.py # GUI model management
+├── models/
+│   ├── model_registry.py    # Model metadata and cache detection
+│   ├── model_downloader.py  # Explicit download orchestration
+│   └── downloaders/         # Provider-specific download adapters
 ├── tests/
 │   └── test_voice_cloner.py # Unit tests
 ├── voice-samples/           # Reference voice files

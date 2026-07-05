@@ -4,11 +4,19 @@ from typing import Any, Literal
 
 import numpy as np
 
+from models.exceptions import ModelNotInstalledError
+from models.model_registry import get_registry
 from tts_engine_base import TTSEngineBase
 
 logger = logging.getLogger("voice_cloner.chatterbox")
 
 ChatterboxVariant = Literal["turbo", "standard"]
+
+# Model IDs for registry lookup
+CHATTERBOX_MODEL_IDS = {
+    "turbo": "chatterbox-turbo",
+    "standard": "chatterbox-standard",
+}
 
 
 class ChatterboxEngine(TTSEngineBase):
@@ -20,16 +28,50 @@ class ChatterboxEngine(TTSEngineBase):
     # Paralinguistic tags supported by Turbo variant
     PARALINGUISTIC_TAGS = ["laugh", "chuckle", "cough", "sigh", "gasp", "yawn"]
 
-    def __init__(self, speaker_wav: str, device: str | None = None, variant: ChatterboxVariant = "turbo"):
+    def __init__(
+        self,
+        speaker_wav: str,
+        device: str | None = None,
+        variant: ChatterboxVariant = "turbo",
+        auto_download: bool = False,
+    ):
+        """
+        Initialize Chatterbox TTS engine.
+
+        Args:
+            speaker_wav: Path to speaker reference audio (~10 seconds recommended).
+            device: Device to use ("cuda" or "cpu").
+            variant: "turbo" (fast, 350M) or "standard" (higher quality, 500M).
+            auto_download: If True, allow the backend to download a missing model.
+                          Defaults to False so generation never downloads models
+                          unless the caller explicitly opts in.
+        """
         super().__init__(speaker_wav, device)
         self.variant = variant
+        self.auto_download = auto_download
         self._model = None  # Lazy loading
         self._sample_rate = None
+        self._registry = get_registry()
+        self._model_id = CHATTERBOX_MODEL_IDS.get(variant, "chatterbox-turbo")
+
+    def _check_model_installed(self) -> bool:
+        """Check if the model is installed."""
+        return self._registry.is_installed(self._model_id)
 
     @property
     def model(self):
         """Lazy load model on first use."""
         if self._model is None:
+            # Check if model is installed
+            if not self._check_model_installed():
+                if not self.auto_download:
+                    raise ModelNotInstalledError(
+                        model_id=self._model_id,
+                        engine="chatterbox",
+                        install_command=f"python vcloner.py --download-models {self._model_id}",
+                    )
+                logger.info(f"Model {self._model_id} not found; auto_download=True so backend download is allowed...")
+
             logger.info(f"Loading Chatterbox {self.variant} model...")
             try:
                 from chatterbox.tts import ChatterboxTTS
@@ -38,9 +80,16 @@ class ChatterboxEngine(TTSEngineBase):
                 self._sample_rate = self._model.sr
                 logger.info(f"Chatterbox {self.variant} model loaded successfully")
             except ImportError as e:
-                logger.error("chatterbox-tts package not installed. " "Install with: pip install chatterbox-tts")
+                logger.error("chatterbox-tts package not installed. Install with: pip install chatterbox-tts")
                 raise ImportError("chatterbox-tts package required. Install with: pip install chatterbox-tts") from e
         return self._model
+
+    @classmethod
+    def is_model_installed(cls, variant: ChatterboxVariant = "turbo") -> bool:
+        """Check if a Chatterbox model variant is installed."""
+        registry = get_registry()
+        model_id = CHATTERBOX_MODEL_IDS.get(variant, "chatterbox-turbo")
+        return registry.is_installed(model_id)
 
     @property
     def sample_rate(self) -> int:
