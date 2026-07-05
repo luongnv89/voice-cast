@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMenu,
     QMessageBox,
+    QProgressBar,
     QVBoxLayout,
     QWidget,
 )
@@ -101,7 +102,12 @@ class VoiceCloningApp(QMainWindow):
         self.setWindowIcon(QIcon(str(Path(__file__).parent / "icon.jpg")))
 
         # Initialize pygame mixer for audio
-        pygame.mixer.init()
+        self._audio_available = True
+        try:
+            pygame.mixer.init()
+        except pygame.error as e:
+            self._audio_available = False
+            print(f"Warning: Audio playback unavailable — pygame.mixer.init() failed: {e}")
 
         # Connect theme changes
         self._theme_manager.theme_changed.connect(self._on_theme_changed)
@@ -162,8 +168,9 @@ class VoiceCloningApp(QMainWindow):
     def closeEvent(self, event):
         """Clean up resources when window closes."""
         # Stop any playing audio
-        pygame.mixer.music.stop()
-        pygame.mixer.quit()
+        if self._audio_available:
+            pygame.mixer.music.stop()
+            pygame.mixer.quit()
 
         # Wait for thread to finish
         if self.clone_thread and self.clone_thread.isRunning():
@@ -274,6 +281,13 @@ class VoiceCloningApp(QMainWindow):
         self.btn_generate.setMinimumHeight(48)
         self.btn_generate.clicked.connect(self.start_cloning)
         layout.addWidget(self.btn_generate)
+
+        # Activity indicator
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 0)  # indeterminate
+        self.progress_bar.setFixedHeight(20)
+        self.progress_bar.hide()
+        layout.addWidget(self.progress_bar)
 
         # Result controls
         result_layout = QHBoxLayout()
@@ -401,6 +415,7 @@ class VoiceCloningApp(QMainWindow):
         self.btn_save.hide()
         self.btn_select_voice.setEnabled(False)
         self.engine_combo.setEnabled(False)
+        self.progress_bar.show()
 
         # Get selected engine and parameters
         engine_name = self.engine_combo.currentData()
@@ -450,9 +465,13 @@ class VoiceCloningApp(QMainWindow):
         self.btn_generate.setText("Generate Audio")
         self.btn_select_voice.setEnabled(True)
         self.engine_combo.setEnabled(True)
+        self.progress_bar.hide()
 
     def play_audio(self):
         """Play the generated audio."""
+        if not self._audio_available:
+            QMessageBox.warning(self, "Playback Unavailable", "Audio playback is not available on this system.")
+            return
         if self.current_audio and Path(self.current_audio).exists():
             # Stop any currently playing audio first
             pygame.mixer.music.stop()
