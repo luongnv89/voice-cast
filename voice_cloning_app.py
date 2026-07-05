@@ -20,7 +20,6 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMenu,
     QMessageBox,
-    QProgressBar,
     QVBoxLayout,
     QWidget,
 )
@@ -32,6 +31,7 @@ from gui.styled_widgets import (
     StyledComboBox,
     StyledGroupBox,
     StyledLabel,
+    StyledProgressBar,
     StyledTabWidget,
     StyledTextEdit,
 )
@@ -168,7 +168,7 @@ class VoiceCloningApp(QMainWindow):
     def _on_tab_changed(self, index: int):
         """Refresh model status when Model Manager tab is activated."""
         if self.tab_widget.widget(index) == self.model_manager:
-            self.model_manager._refresh_models()
+            self.model_manager.refresh_models()
 
     def closeEvent(self, event):
         """Clean up resources when window closes."""
@@ -262,6 +262,7 @@ class VoiceCloningApp(QMainWindow):
         voice_layout.setSpacing(SPACING.md)
 
         self.btn_select_voice = StyledButton("Select Voice File", variant="secondary")
+        self.btn_select_voice.setAccessibleName("Select voice file")
         self.btn_select_voice.clicked.connect(self.select_voice_file)
         voice_layout.addWidget(self.btn_select_voice)
 
@@ -284,12 +285,13 @@ class VoiceCloningApp(QMainWindow):
 
         # Generate button
         self.btn_generate = StyledButton("Generate Audio", variant="primary")
+        self.btn_generate.setAccessibleName("Generate audio")
         self.btn_generate.setMinimumHeight(48)
         self.btn_generate.clicked.connect(self.start_cloning)
         layout.addWidget(self.btn_generate)
 
         # Activity indicator
-        self.progress_bar = QProgressBar()
+        self.progress_bar = StyledProgressBar()
         self.progress_bar.setAccessibleName("Generation progress")
         self.progress_bar.setRange(0, 0)  # indeterminate
         self.progress_bar.setFixedHeight(20)
@@ -301,10 +303,12 @@ class VoiceCloningApp(QMainWindow):
         result_layout.setSpacing(SPACING.md)
 
         self.btn_play = StyledButton("Play", variant="secondary")
+        self.btn_play.setAccessibleName("Play audio")
         self.btn_play.clicked.connect(self.play_audio)
         self.btn_play.hide()
 
         self.btn_save = StyledButton("Save Audio", variant="secondary")
+        self.btn_save.setAccessibleName("Save audio")
         self.btn_save.clicked.connect(self.save_audio)
         self.btn_save.hide()
 

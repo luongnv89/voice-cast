@@ -325,7 +325,7 @@ class ModelManagerWidget(QWidget):
         button_layout.setSpacing(SPACING.sm)
 
         self.refresh_btn = StyledButton("Refresh Status", variant="secondary")
-        self.refresh_btn.clicked.connect(self._refresh_models)
+        self.refresh_btn.clicked.connect(self.refresh_models)
         button_layout.addWidget(self.refresh_btn)
         button_layout.addStretch()
 
@@ -381,7 +381,7 @@ class ModelManagerWidget(QWidget):
 
         self.models_layout.addStretch()
 
-    def _refresh_models(self):
+    def refresh_models(self):
         """Refresh model status from registry."""
         for engine_name, section in self._engine_sections.items():
             for model in self._registry.list_models():
