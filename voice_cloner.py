@@ -224,9 +224,13 @@ class VoiceCloner:
         return r.is_installed(model_id)
 
     @staticmethod
-    def download_model(model_id: str, progress_callback: ProgressCallback | None = None):
+    def download_model(
+        model_id: str,
+        progress_callback: ProgressCallback | None = None,
+        registry: ModelRegistry | None = None,
+    ):
         """Explicitly download a model and return its local path."""
-        return ModelDownloader().download(model_id, progress_callback=progress_callback)
+        return ModelDownloader(registry=registry).download(model_id, progress_callback=progress_callback)
 
     @staticmethod
     def get_model_id_for_engine(engine_name: str, registry: ModelRegistry | None = None) -> str:
