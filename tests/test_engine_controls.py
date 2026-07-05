@@ -31,8 +31,7 @@ class StubEngine:
         self.device = device
         self.kwargs = kwargs
 
-    def generate(self, text, **kwargs):
-        ...
+    def generate(self, text, **kwargs): ...
 
     def get_supported_parameters(self):
         return []
@@ -187,10 +186,12 @@ class TestMlxVoiceMetadata:
 
     def test_voice_groups_is_engine_source(self):
         from engines.mlx_audio_engine import KOKORO_VOICES
+
         assert MlxKokoroControls.VOICE_GROUPS is KOKORO_VOICES
 
     def test_lang_codes_is_engine_source(self):
         from engines.mlx_audio_engine import KOKORO_LANG_CODES
+
         assert MlxKokoroControls.LANG_CODES is KOKORO_LANG_CODES
 
     def test_voice_groups_contains_expected_languages(self):
@@ -201,8 +202,10 @@ class TestMlxVoiceMetadata:
 
     def test_voice_groups_has_same_structure_as_engine(self):
         from engines.mlx_audio_engine import KOKORO_VOICES
+
         assert set(MlxKokoroControls.VOICE_GROUPS.keys()) == set(KOKORO_VOICES.keys())
 
     def test_lang_codes_has_same_mapping(self):
         from engines.mlx_audio_engine import KOKORO_LANG_CODES
+
         assert MlxKokoroControls.LANG_CODES == KOKORO_LANG_CODES
