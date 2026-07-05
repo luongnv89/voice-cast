@@ -14,6 +14,22 @@ logger = logging.getLogger("voice_cloner.models")
 class ModelRegistry:
     """Registry for managing TTS model metadata and installation status."""
 
+    # Public engine names used by the factory/CLI mapped to registry model IDs.
+    _ENGINE_MODEL_IDS: dict[str, str] = {
+        "coqui": "coqui-xtts-v2",
+        "chatterbox-turbo": "chatterbox-turbo",
+        "chatterbox-standard": "chatterbox-standard",
+        "mlx-kokoro": "mlx-kokoro",
+        "mlx-csm": "mlx-csm",
+    }
+
+    # Group aliases accepted by CLI/API model-management commands.
+    _ENGINE_GROUP_ALIASES: dict[str, str] = {
+        "chatterbox": "chatterbox",
+        "mlx": "mlx-audio",
+        "mlx-audio": "mlx-audio",
+    }
+
     # Default model definitions
     _DEFAULT_MODELS: list[ModelInfo] = [
         ModelInfo(
@@ -85,15 +101,8 @@ class ModelRegistry:
 
     def _setup_cache_dirs(self):
         """Set up cache directory paths for each engine."""
-        # Check for custom model directory
-        custom_dir = os.environ.get("VOICECAST_MODELS_DIR")
-        if custom_dir:
-            base_dir = Path(custom_dir)
-            self._cache_dirs["coqui"] = base_dir / "coqui"
-            self._cache_dirs["chatterbox"] = base_dir / "chatterbox"
-            return
-
-        # Use default cache locations
+        # Use provider-native cache locations. Keeping registry checks aligned
+        # with backend loader defaults prevents generation-time cache misses.
         home = Path.home()
 
         # Coqui uses ~/.local/share/tts on Linux, ~/Library/... on macOS
@@ -145,9 +154,25 @@ class ModelRegistry:
         model = self.get_model(model_id)
         return model.install_path
 
+    def list_model_ids(self) -> list[str]:
+        """List registered model IDs."""
+        return list(self._models.keys())
+
+    def get_model_id_for_engine(self, engine_name: str) -> str:
+        """Map a public engine name to its default model ID."""
+        if engine_name in self._ENGINE_MODEL_IDS:
+            return self._ENGINE_MODEL_IDS[engine_name]
+        if engine_name in self._models:
+            return engine_name
+        raise ModelNotFoundError(engine_name, self.list_model_ids())
+
     def get_models_for_engine(self, engine: str) -> list[ModelInfo]:
-        """Get all models for a specific engine."""
-        return [self.get_model(m.id) for m in self._models.values() if m.engine == engine]
+        """Get all models for a public engine name or engine group."""
+        if engine in self._ENGINE_MODEL_IDS:
+            return [self.get_model(self._ENGINE_MODEL_IDS[engine])]
+
+        engine_group = self._ENGINE_GROUP_ALIASES.get(engine, engine)
+        return [self.get_model(m.id) for m in self._models.values() if m.engine == engine_group]
 
     def _check_installation(self, model: ModelInfo) -> tuple[bool, Path | None]:
         """Check if a model is installed and return its path."""

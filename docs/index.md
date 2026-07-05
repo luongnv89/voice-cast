@@ -18,12 +18,14 @@ If you're new to VoiceCast, start here:
 | [CLI Reference](cli-reference.md) | Command-line interface documentation |
 | [API Reference](api-reference.md) | Complete Python API reference |
 | [Engines Guide](engines.md) | TTS engine comparison and parameters |
+| [Model Management](model-management.md) | Explicit model download, cache, CLI, GUI, and API workflow |
 
 ## Technical Documentation
 
 | Document | Description |
 |----------|-------------|
 | [Architecture](architecture.md) | System design with diagrams |
+| [Model Management](model-management.md) | Model registry, downloader, and cache behavior |
 | [Development](development.md) | Contributing and extending |
 | [Troubleshooting](troubleshooting.md) | Common issues and fixes |
 
@@ -34,6 +36,7 @@ If you're new to VoiceCast, start here:
 - **I want to clone a voice quickly** → [GUI Guide](gui-guide.md)
 - **I need to batch process files** → [CLI Reference](cli-reference.md)
 - **I'm integrating into my app** → [API Reference](api-reference.md)
+- **I need to install or switch models** → [Model Management](model-management.md)
 - **I want multilingual support** → [Engines Guide](engines.md#coqui-xtts-v2)
 - **I need expressive speech** → [Engines Guide](engines.md#chatterbox-turbo)
 

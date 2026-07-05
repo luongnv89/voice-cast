@@ -116,7 +116,7 @@ class MlxAudioEngine(TTSEngineBase):
         speaker_wav: str,
         device: str | None = None,
         variant: MlxVariant = "kokoro",
-        auto_download: bool = True,
+        auto_download: bool = False,
     ):
         """
         Initialize MLX Audio TTS engine.
@@ -125,15 +125,16 @@ class MlxAudioEngine(TTSEngineBase):
             speaker_wav: Path to speaker reference audio (required for CSM, ignored for Kokoro).
             device: Device to use (defaults to "mps" on Apple Silicon).
             variant: "kokoro" (preset voices) or "csm" (voice cloning).
-            auto_download: If True, automatically download model if not installed.
+            auto_download: If True, allow the backend to download a missing model.
+                          Defaults to False so generation never downloads models
+                          unless the caller explicitly opts in.
 
         Raises:
             RuntimeError: If not running on Apple Silicon.
         """
         if not is_apple_silicon():
             raise RuntimeError(
-                "MLX Audio requires Apple Silicon (M1/M2/M3/M4). "
-                "This engine is not available on your platform."
+                "MLX Audio requires Apple Silicon (M1/M2/M3/M4). This engine is not available on your platform."
             )
 
         super().__init__(speaker_wav, device)
@@ -165,7 +166,7 @@ class MlxAudioEngine(TTSEngineBase):
                         engine="mlx-audio",
                         install_command=f"python vcloner.py --download-models {self._model_id}",
                     )
-                logger.info(f"Model {self._model_id} not found, will download on first use...")
+                logger.info(f"Model {self._model_id} not found; auto_download=True so backend download is allowed...")
 
             logger.info(f"Loading MLX Audio {self.variant} model...")
             try:
@@ -179,9 +180,7 @@ class MlxAudioEngine(TTSEngineBase):
                 logger.info(f"MLX Audio {self.variant} model loaded successfully")
             except ImportError as e:
                 logger.error("mlx-audio package not installed. Install with: pip install mlx-audio")
-                raise ImportError(
-                    "mlx-audio package required. Install with: pip install -e '.[mlx]'"
-                ) from e
+                raise ImportError("mlx-audio package required. Install with: pip install -e '.[mlx]'") from e
         return self._model
 
     @property
@@ -217,9 +216,7 @@ class MlxAudioEngine(TTSEngineBase):
         else:
             return self._generate_csm(text, speed)
 
-    def _generate_kokoro(
-        self, text: str, voice: str, speed: float, lang_code: str
-    ) -> tuple[np.ndarray, int]:
+    def _generate_kokoro(self, text: str, voice: str, speed: float, lang_code: str) -> tuple[np.ndarray, int]:
         """Generate audio using Kokoro preset voices."""
         audio_data = None
 

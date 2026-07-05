@@ -6,9 +6,14 @@ from typing import Any
 import numpy as np
 import soundfile as sf
 
+from models.exceptions import ModelNotInstalledError
+from models.model_registry import get_registry
 from tts_engine_base import TTSEngineBase
 
 logger = logging.getLogger("voice_cloner.coqui")
+
+# Model ID for registry lookup
+COQUI_MODEL_ID = "coqui-xtts-v2"
 
 
 def _ensure_mono(audio_data: np.ndarray) -> np.ndarray:
@@ -45,21 +50,55 @@ class CoquiEngine(TTSEngineBase):
         speaker_wav: str,
         device: str | None = None,
         model_name: str = "tts_models/multilingual/multi-dataset/xtts_v2",
+        auto_download: bool = False,
     ):
+        """
+        Initialize Coqui TTS engine.
+
+        Args:
+            speaker_wav: Path to speaker reference audio.
+            device: Device to use ("cuda" or "cpu").
+            model_name: Coqui model name.
+            auto_download: If True, allow the backend to download a missing model.
+                          Defaults to False so generation never downloads models
+                          unless the caller explicitly opts in.
+        """
         super().__init__(speaker_wav, device)
         self.model_name = model_name
+        self.auto_download = auto_download
         self._tts = None  # Lazy loading
+        self._registry = get_registry()
+
+    def _check_model_installed(self) -> bool:
+        """Check if the model is installed."""
+        return self._registry.is_installed(COQUI_MODEL_ID)
 
     @property
     def tts(self):
         """Lazy load TTS model on first use."""
         if self._tts is None:
+            # Check if model is installed
+            if not self._check_model_installed():
+                if not self.auto_download:
+                    raise ModelNotInstalledError(
+                        model_id=COQUI_MODEL_ID,
+                        engine="coqui",
+                        install_command=f"python vcloner.py --download-models {COQUI_MODEL_ID}",
+                    )
+                logger.info(f"Model {COQUI_MODEL_ID} not found; auto_download=True so backend download is allowed...")
+
             from TTS.api import TTS
 
             logger.info(f"Loading Coqui TTS model: {self.model_name}")
-            self._tts = TTS(model_name=self.model_name, progress_bar=False, gpu=(self.device == "cuda"))
+            self._tts = TTS(model_name=self.model_name, progress_bar=True, gpu=(self.device == "cuda"))
             logger.info("Coqui TTS model loaded successfully")
         return self._tts
+
+    @classmethod
+    def is_model_installed(cls) -> bool:
+        """Check if the Coqui XTTS v2 model is installed."""
+        registry = get_registry()
+        return registry.is_installed(COQUI_MODEL_ID)
 
     def generate(
         self, text: str, language: str = "en", temperature: float = 0.7, gpt_cond_len: int = 128, **kwargs

@@ -17,7 +17,6 @@ from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
     QHBoxLayout,
-    QLabel,
     QMainWindow,
     QMenu,
     QMessageBox,
@@ -32,6 +31,7 @@ from gui.styled_widgets import (
     StyledComboBox,
     StyledGroupBox,
     StyledLabel,
+    StyledProgressBar,
     StyledTabWidget,
     StyledTextEdit,
 )
@@ -102,7 +102,12 @@ class VoiceCloningApp(QMainWindow):
         self.setWindowIcon(QIcon(str(Path(__file__).parent / "icon.jpg")))
 
         # Initialize pygame mixer for audio
-        pygame.mixer.init()
+        self._audio_available = True
+        try:
+            pygame.mixer.init()
+        except pygame.error as e:
+            self._audio_available = False
+            print(f"Warning: Audio playback unavailable — pygame.mixer.init() failed: {e}")
 
         # Connect theme changes
         self._theme_manager.theme_changed.connect(self._on_theme_changed)
@@ -160,16 +165,26 @@ class VoiceCloningApp(QMainWindow):
         """Handle theme change."""
         self._update_theme_menu_state()
 
+    def _on_tab_changed(self, index: int):
+        """Refresh model status when Model Manager tab is activated."""
+        if self.tab_widget.widget(index) == self.model_manager:
+            self.model_manager.refresh_models()
+
     def closeEvent(self, event):
         """Clean up resources when window closes."""
         # Stop any playing audio
-        pygame.mixer.music.stop()
-        pygame.mixer.quit()
+        if self._audio_available:
+            pygame.mixer.music.stop()
+            pygame.mixer.quit()
 
         # Wait for thread to finish
         if self.clone_thread and self.clone_thread.isRunning():
             self.clone_thread.quit()
             self.clone_thread.wait(1000)
+
+        # Wait for model downloads before widgets are destroyed.
+        if self.model_manager:
+            self.model_manager.shutdown_downloads()
 
         # Clean up temp files
         self._cleanup_temp_files()
@@ -199,6 +214,7 @@ class VoiceCloningApp(QMainWindow):
         # Create Model Manager tab
         self.model_manager = ModelManagerWidget()
         self.tab_widget.addTab(self.model_manager, "Model Manager")
+        self.tab_widget.currentChanged.connect(self._on_tab_changed)
 
     def _setup_voice_tab(self, tab_widget: QWidget):
         """Set up the voice cloning tab."""
@@ -246,6 +262,7 @@ class VoiceCloningApp(QMainWindow):
         voice_layout.setSpacing(SPACING.md)
 
         self.btn_select_voice = StyledButton("Select Voice File", variant="secondary")
+        self.btn_select_voice.setAccessibleName("Select voice file")
         self.btn_select_voice.clicked.connect(self.select_voice_file)
         voice_layout.addWidget(self.btn_select_voice)
 
@@ -268,19 +285,30 @@ class VoiceCloningApp(QMainWindow):
 
         # Generate button
         self.btn_generate = StyledButton("Generate Audio", variant="primary")
+        self.btn_generate.setAccessibleName("Generate audio")
         self.btn_generate.setMinimumHeight(48)
         self.btn_generate.clicked.connect(self.start_cloning)
         layout.addWidget(self.btn_generate)
+
+        # Activity indicator
+        self.progress_bar = StyledProgressBar()
+        self.progress_bar.setAccessibleName("Generation progress")
+        self.progress_bar.setRange(0, 0)  # indeterminate
+        self.progress_bar.setFixedHeight(20)
+        self.progress_bar.hide()
+        layout.addWidget(self.progress_bar)
 
         # Result controls
         result_layout = QHBoxLayout()
         result_layout.setSpacing(SPACING.md)
 
         self.btn_play = StyledButton("Play", variant="secondary")
+        self.btn_play.setAccessibleName("Play audio")
         self.btn_play.clicked.connect(self.play_audio)
         self.btn_play.hide()
 
         self.btn_save = StyledButton("Save Audio", variant="secondary")
+        self.btn_save.setAccessibleName("Save audio")
         self.btn_save.clicked.connect(self.save_audio)
         self.btn_save.hide()
 
@@ -351,14 +379,7 @@ class VoiceCloningApp(QMainWindow):
 
     def _get_model_id_for_engine(self, engine_name: str) -> str:
         """Get the model ID for an engine name."""
-        model_map = {
-            "coqui": "coqui-xtts-v2",
-            "chatterbox-turbo": "chatterbox-turbo",
-            "chatterbox-standard": "chatterbox-standard",
-            "mlx-kokoro": "mlx-kokoro",
-            "mlx-csm": "mlx-csm",
-        }
-        return model_map.get(engine_name, engine_name)
+        return self._registry.get_model_id_for_engine(engine_name)
 
     def start_cloning(self):
         """Start the voice cloning process."""
@@ -405,6 +426,7 @@ class VoiceCloningApp(QMainWindow):
         self.btn_save.hide()
         self.btn_select_voice.setEnabled(False)
         self.engine_combo.setEnabled(False)
+        self.progress_bar.show()
 
         # Get selected engine and parameters
         engine_name = self.engine_combo.currentData()
@@ -454,9 +476,13 @@ class VoiceCloningApp(QMainWindow):
         self.btn_generate.setText("Generate Audio")
         self.btn_select_voice.setEnabled(True)
         self.engine_combo.setEnabled(True)
+        self.progress_bar.hide()
 
     def play_audio(self):
         """Play the generated audio."""
+        if not self._audio_available:
+            QMessageBox.warning(self, "Playback Unavailable", "Audio playback is not available on this system.")
+            return
         if self.current_audio and Path(self.current_audio).exists():
             # Stop any currently playing audio first
             pygame.mixer.music.stop()

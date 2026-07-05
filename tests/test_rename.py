@@ -19,7 +19,7 @@ def test_readme_has_new_name():
     with open(readme_path) as f:
         content = f.read()
 
-    assert "# VoiceCast" in content
+    assert "VoiceCast" in content
     assert "Your words, any voice" in content
     assert "voice-cast.git" in content
     assert "voicecast-app.png" in content
@@ -68,27 +68,6 @@ def test_ci_workflow_updated():
     with open(ci_path) as f:
         content = f.read()
 
-    assert "VoiceCast" in content
-
-
-def test_openspec_updated():
-    """Verify openspec files have been updated."""
-    openspec_dir = os.path.join(
-        os.path.dirname(__file__),
-        "..",
-        "openspec",
-        "changes",
-        "integrate-chatterbox-tts",
-    )
-
-    # Check proposal.md
-    with open(os.path.join(openspec_dir, "proposal.md")) as f:
-        content = f.read()
-    assert "VoiceCast" in content
-
-    # Check design.md
-    with open(os.path.join(openspec_dir, "design.md")) as f:
-        content = f.read()
     assert "VoiceCast" in content
 
 

@@ -19,6 +19,9 @@ vcloner [options]
 ```
 vcloner -i <voice_file> -t <text> -o <output_file> [options]
 vcloner --list-engines
+vcloner --list-models
+vcloner --download-models <model-id> [<model-id> ...]
+vcloner --download-models --engine <engine-group>
 vcloner --help
 ```
 
@@ -40,6 +43,8 @@ vcloner --help
 | `--language` | `-l` | `en` | Language code |
 | `--no-play` | | | Don't play audio after generation |
 | `--list-engines` | | | List available engines and exit |
+| `--list-models` | | | List available models, sizes, and cache status |
+| `--download-models` | | | Explicitly download model IDs, or combine with `--engine` to download an engine group |
 | `--help` | `-h` | | Show help message |
 
 ### Coqui-Specific Options
@@ -68,6 +73,27 @@ Check installed engines:
 ```bash
 python vcloner.py --list-engines
 ```
+
+## Model Management
+
+VoiceCast does not download models during installation or normal generation. Use
+these commands to manage model files explicitly:
+
+```bash
+# Show available models and whether each is cached locally
+python vcloner.py --list-models
+
+# Download one or more specific models
+python vcloner.py --download-models coqui-xtts-v2
+python vcloner.py --download-models chatterbox-turbo chatterbox-standard
+
+# Download all models for an engine group
+python vcloner.py --download-models --engine chatterbox
+```
+
+If a model is missing during generation, the CLI exits with a clear command you
+can run to download it. See [Model Management](model-management.md) for cache
+locations and the Python API.
 
 ## Examples
 
@@ -295,9 +321,18 @@ Check which engines are installed:
 python vcloner.py --list-engines
 ```
 
+### Model Not Installed
+
+Normal generation never downloads models implicitly. List and download models first:
+
+```bash
+python vcloner.py --list-models
+python vcloner.py --download-models coqui-xtts-v2
+```
+
 ### Slow Generation
 
-- First run downloads models (~2GB) - subsequent runs are faster
+- First model load can still take time after an explicit download
 - Use `--engine chatterbox-turbo` for faster generation
 - Ensure CUDA is available for GPU acceleration
 

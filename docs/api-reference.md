@@ -19,6 +19,7 @@ VoiceCloner(
     speaker_wav: str,
     engine: str | TTSEngineBase | None = None,
     device: str | None = None,
+    auto_download: bool = False,
     **engine_kwargs
 )
 ```
@@ -30,6 +31,7 @@ VoiceCloner(
 | `speaker_wav` | `str` | Required | Path to speaker reference audio file (WAV/MP3) |
 | `engine` | `str \| TTSEngineBase` | `"coqui"` | Engine name or custom engine instance |
 | `device` | `str` | Auto-detect | `"cuda"` for GPU or `"cpu"` |
+| `auto_download` | `bool` | `False` | Explicit opt-in for backend downloads during generation. Leave `False` to require pre-downloaded models. |
 | `**engine_kwargs` | `dict` | `{}` | Engine-specific constructor parameters |
 
 **Available Engines:**
@@ -56,9 +58,12 @@ cloner = VoiceCloner(
 )
 ```
 
+**Model download behavior:** VoiceCast does not download model files during normal initialization or generation. Use `VoiceCloner.download_model()` or `python vcloner.py --download-models <model-id>` first. Missing models raise `ModelNotInstalledError`.
+
 **Raises:**
 - `FileNotFoundError` - If speaker reference file doesn't exist
 - `ValueError` - If unknown engine name is provided
+- `ModelNotInstalledError` - If generation needs a model that has not been downloaded
 
 ---
 
@@ -265,6 +270,66 @@ languages = cloner.get_supported_languages()
 print(f"Supported: {', '.join(languages)}")
 # Output: Supported: en, es, fr, de, it, pt, ...
 ```
+
+---
+
+#### `switch_engine()`
+
+```python
+switch_engine(engine: str, **engine_kwargs) -> None
+```
+
+Switch an existing `VoiceCloner` instance to another engine/model without implicit downloads.
+
+**Example:**
+
+```python
+cloner.switch_engine("chatterbox-turbo")
+```
+
+---
+
+#### `list_models()` (static)
+
+```python
+@staticmethod
+list_models() -> list[ModelInfo]
+```
+
+List registered models with current cache status.
+
+---
+
+#### `download_model()` (static)
+
+```python
+@staticmethod
+download_model(model_id: str, progress_callback: ProgressCallback | None = None) -> Path
+```
+
+Explicitly download a model and return the local cache path.
+
+---
+
+#### `is_model_installed()` (static)
+
+```python
+@staticmethod
+is_model_installed(model_id: str) -> bool
+```
+
+Return whether a model is available in the local cache.
+
+---
+
+#### `get_model_id_for_engine()` (static)
+
+```python
+@staticmethod
+get_model_id_for_engine(engine_name: str) -> str
+```
+
+Map a public engine name such as `chatterbox-turbo` to its model ID.
 
 ---
 
