@@ -42,7 +42,7 @@ from gui.theme import (
     get_theme_manager,
 )
 from models.model_registry import get_registry
-from tts_factory import TTSFactory
+from tts_factory import TTSFactory, bootstrap_engines
 from voice_cloner import VoiceCloner
 
 
@@ -504,6 +504,7 @@ class VoiceCloningApp(QMainWindow):
 
 def main():
     """Application entry point."""
+    bootstrap_engines()
     app = QApplication(sys.argv)
 
     # Set application metadata
