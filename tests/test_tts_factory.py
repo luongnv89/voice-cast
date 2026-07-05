@@ -186,6 +186,77 @@ class TestTTSFactoryAvailability:
             assert TTSFactory.get_default_engine() == "alpha"
 
 
+class TestEngineDescriptorControlsClass:
+    """Tests for the controls_class field on EngineDescriptor."""
+
+    def test_controls_class_defaults_to_none(self):
+        d = EngineDescriptor(name="foo", engine_class=StubEngine, display_name="Foo")
+        assert d.controls_class is None
+
+    def test_controls_class_can_be_set(self):
+        d = EngineDescriptor(
+            name="bar",
+            engine_class=StubEngine,
+            display_name="Bar",
+            controls_class=dict,
+        )
+        assert d.controls_class is dict
+
+    def test_controls_class_in_all_fields(self):
+        d = EngineDescriptor(
+            name="baz",
+            engine_class=StubEngine,
+            display_name="Baz",
+            requires_reference_audio=False,
+            supports_preset_voices=True,
+            platform_restriction="apple_silicon",
+            default_kwargs={"variant": "turbo"},
+            controls_class=list,
+        )
+        assert d.controls_class is list
+
+
+class TestTTSFactoryGetControlsClass:
+    """Tests for TTSFactory.get_controls_class()."""
+
+    def test_returns_none_for_unknown_engine(self):
+        assert TTSFactory.get_controls_class("nonexistent") is None
+
+    def test_returns_none_when_not_set(self, basic_descriptor):
+        TTSFactory.register(basic_descriptor)
+        assert TTSFactory.get_controls_class("test-engine") is None
+
+    def test_returns_controls_class(self):
+        TTSFactory.register(
+            EngineDescriptor(
+                name="with-controls",
+                engine_class=StubEngine,
+                display_name="With Controls",
+                controls_class=dict,
+            )
+        )
+        assert TTSFactory.get_controls_class("with-controls") is dict
+
+    def test_isolation_between_engines(self):
+        TTSFactory.register(
+            EngineDescriptor(
+                name="engine-a",
+                engine_class=StubEngine,
+                display_name="Engine A",
+                controls_class=dict,
+            )
+        )
+        TTSFactory.register(
+            EngineDescriptor(
+                name="engine-b",
+                engine_class=StubEngine,
+                display_name="Engine B",
+            )
+        )
+        assert TTSFactory.get_controls_class("engine-a") is dict
+        assert TTSFactory.get_controls_class("engine-b") is None
+
+
 class TestBootstrapEngines:
     def test_bootstrap_preserves_existing_registrations(self):
         TTSFactory.register(EngineDescriptor(name="pre-existing", engine_class=StubEngine, display_name="Pre"))
