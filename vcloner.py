@@ -88,8 +88,8 @@ def download_models(model_ids: list[str], engine: str | None = None):
             ) as progress:
                 task = progress.add_task(f"Downloading {model_id}", total=model.size_mb * 1024 * 1024)
 
-                def update_progress(p: DownloadProgress):
-                    progress.update(task, completed=p.downloaded_bytes, total=p.total_bytes)
+                def update_progress(p: DownloadProgress, task_id=task):
+                    progress.update(task_id, completed=p.downloaded_bytes, total=p.total_bytes)
 
                 downloader.download(model_id, progress_callback=update_progress)
 

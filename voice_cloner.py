@@ -75,10 +75,9 @@ class VoiceCloner:
                 pass  # Unknown engine, assume it needs voice file
 
         # Ensure the speaker reference file exists if required
-        if requires_voice and self.speaker_wav:
-            if not os.path.exists(self.speaker_wav):
-                logger.error(f"Speaker reference file not found: {self.speaker_wav}")
-                raise FileNotFoundError(f"Speaker reference file not found: {self.speaker_wav}")
+        if requires_voice and self.speaker_wav and not os.path.exists(self.speaker_wav):
+            logger.error(f"Speaker reference file not found: {self.speaker_wav}")
+            raise FileNotFoundError(f"Speaker reference file not found: {self.speaker_wav}")
 
         if isinstance(engine, str):
             engine_kwargs.setdefault("auto_download", auto_download)

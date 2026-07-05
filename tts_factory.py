@@ -119,7 +119,7 @@ class TTSFactory:
     @classmethod
     def get_available_engines(cls) -> list[str]:
         """Get list of engines that are available on this platform with dependencies satisfied."""
-        return [name for name in cls._registry.keys() if cls.is_available(name)]
+        return [name for name in cls._registry if cls.is_available(name)]
 
     @classmethod
     def get_engine_metadata(cls, engine_name: str) -> dict[str, Any]:

@@ -170,6 +170,10 @@ class VoiceCloningApp(QMainWindow):
             self.clone_thread.quit()
             self.clone_thread.wait(1000)
 
+        # Wait for model downloads before widgets are destroyed.
+        if self.model_manager:
+            self.model_manager.shutdown_downloads()
+
         # Clean up temp files
         self._cleanup_temp_files()
 

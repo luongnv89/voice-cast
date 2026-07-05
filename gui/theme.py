@@ -70,20 +70,20 @@ LIGHT_PALETTE = ColorPalette(
     # Text
     text_primary="#000000",
     text_secondary="#4A4A4A",
-    text_muted="#808080",
+    text_muted="#666666",
     # Borders
     border_primary="#D0D0D0",
     border_secondary="#E0E0E0",
-    border_focus="#2E7D32",
+    border_focus="#000000",
     # Accent (Dark Green)
     accent="#2E7D32",
     accent_hover="#1B5E20",
     accent_muted="#81C784",
     # Status (text only)
     danger="#DC3545",
-    warning="#D4A000",
+    warning="#8A6D00",
     info="#0D6EFD",
-    success="#28A745",
+    success="#1E7E34",
     # Interactive
     hover_overlay="rgba(0, 0, 0, 0.04)",
     pressed_overlay="rgba(0, 0, 0, 0.08)",
@@ -105,7 +105,7 @@ DARK_PALETTE = ColorPalette(
     # Borders
     border_primary="#404040",
     border_secondary="#303030",
-    border_focus="#4CAF50",
+    border_focus="#FFFFFF",
     # Accent (Dark Green - slightly brighter for dark mode visibility)
     accent="#4CAF50",
     accent_hover="#66BB6A",

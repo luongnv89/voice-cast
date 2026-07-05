@@ -5,6 +5,7 @@ Provides model browsing, download, and status management.
 """
 
 from PySide6.QtCore import QThread, Signal, Slot
+from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QMessageBox,
@@ -47,6 +48,8 @@ class ModelDownloadThread(QThread):
         try:
 
             def progress_callback(progress: DownloadProgress):
+                if self.isInterruptionRequested():
+                    raise RuntimeError("Download cancelled")
                 self.progress_updated.emit(
                     progress.model_id or self.model_id,
                     progress.downloaded_bytes,
@@ -55,9 +58,11 @@ class ModelDownloadThread(QThread):
                 )
 
             self._downloader.download(self.model_id, progress_callback=progress_callback)
-            self.download_complete.emit(self.model_id)
+            if not self.isInterruptionRequested():
+                self.download_complete.emit(self.model_id)
         except Exception as e:
-            self.download_error.emit(self.model_id, str(e))
+            if not self.isInterruptionRequested():
+                self.download_error.emit(self.model_id, str(e))
 
 
 class ModelCard(StyledCard):
@@ -286,6 +291,7 @@ class ModelManagerWidget(QWidget):
         self._registry = ModelRegistry()
         self._download_threads: dict[str, ModelDownloadThread] = {}
         self._engine_sections: dict[str, EngineSection] = {}
+        self._shutting_down = False
         self._setup_ui()
         get_theme_manager().theme_changed.connect(self._apply_theme)
 
@@ -391,6 +397,7 @@ class ModelManagerWidget(QWidget):
         thread.progress_updated.connect(self._on_progress_updated)
         thread.download_complete.connect(self._on_download_complete)
         thread.download_error.connect(self._on_download_error)
+        thread.finished.connect(lambda model_id=model_id: self._download_threads.pop(model_id, None))
         self._download_threads[model_id] = thread
         thread.start()
 
@@ -408,18 +415,33 @@ class ModelManagerWidget(QWidget):
         if card:
             card.download_finished(success=True)
 
-        if model_id in self._download_threads:
-            del self._download_threads[model_id]
+        self._download_threads.pop(model_id, None)
 
     @Slot(str, str)
     def _on_download_error(self, model_id: str, error_message: str):
         """Handle download error."""
-        card = self._get_card(model_id)
-        if card:
-            card.download_finished(success=False, error_message=error_message)
+        if not self._shutting_down:
+            card = self._get_card(model_id)
+            if card:
+                card.download_finished(success=False, error_message=error_message)
 
-        if model_id in self._download_threads:
-            del self._download_threads[model_id]
+        self._download_threads.pop(model_id, None)
+
+    def shutdown_downloads(self):
+        """Stop active download threads before the widget is destroyed."""
+        self._shutting_down = True
+        for thread in list(self._download_threads.values()):
+            if thread.isRunning():
+                thread.requestInterruption()
+        for thread in list(self._download_threads.values()):
+            if thread.isRunning():
+                thread.wait()
+        self._download_threads.clear()
+
+    def closeEvent(self, event: QCloseEvent):
+        """Ensure active download threads finish before closing."""
+        self.shutdown_downloads()
+        super().closeEvent(event)
 
     def is_model_installed(self, model_id: str) -> bool:
         """Check if a model is installed."""

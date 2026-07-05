@@ -53,7 +53,6 @@ class CoquiDownloader(BaseDownloader):
 
         try:
             # Import TTS here to avoid import errors if not installed
-            from TTS.api import TTS
             from TTS.utils.manage import ModelManager
 
             # Get the model manager to access download functionality. Use the

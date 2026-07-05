@@ -21,7 +21,7 @@ from gui.styled_widgets import (
     StyledLabel,
     StyledSlider,
 )
-from gui.theme import SPACING, get_theme_manager
+from gui.theme import SPACING
 
 
 class EngineControlsBase(QWidget):
@@ -180,7 +180,6 @@ class ChatterboxControls(EngineControlsBase):
         self.parameters_changed.emit(self.get_parameters())
 
     def _show_tags_help(self):
-        palette = get_theme_manager().palette
         tags_text = ", ".join([f"[{tag}]" for tag in self.PARALINGUISTIC_TAGS])
         QMessageBox.information(
             self,
@@ -297,7 +296,7 @@ class MlxKokoroControls(EngineControlsBase):
         lang_layout.addWidget(lang_label)
 
         self.lang_combo = StyledComboBox()
-        for lang in self.VOICE_GROUPS.keys():
+        for lang in self.VOICE_GROUPS:
             self.lang_combo.addItem(lang, self.LANG_CODES[lang])
         self.lang_combo.currentIndexChanged.connect(self._on_language_changed)
         lang_layout.addWidget(self.lang_combo)
@@ -363,7 +362,7 @@ class MlxKokoroControls(EngineControlsBase):
 
         current_lang = self.lang_combo.currentText()
         if current_lang in self.VOICE_GROUPS:
-            for category in self.VOICE_GROUPS[current_lang].keys():
+            for category in self.VOICE_GROUPS[current_lang]:
                 self.category_combo.addItem(category)
 
         self.category_combo.blockSignals(False)
