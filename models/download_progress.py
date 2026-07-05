@@ -1,7 +1,8 @@
 """Download progress tracking."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Protocol
+from typing import Protocol
 
 
 @dataclass

@@ -79,7 +79,7 @@ class ChatterboxDownloader(BaseDownloader):
 
             return Path(cache_dir)
 
-        except ImportError as e:
+        except ImportError:
             # If huggingface_hub not available, try via chatterbox directly
             logger.warning("huggingface_hub not available, trying direct chatterbox import")
             return self._download_via_chatterbox(model_id, progress_callback, start_time, total_size)

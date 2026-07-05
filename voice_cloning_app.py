@@ -17,7 +17,6 @@ from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
     QHBoxLayout,
-    QLabel,
     QMainWindow,
     QMenu,
     QMessageBox,

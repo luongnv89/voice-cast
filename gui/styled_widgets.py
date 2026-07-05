@@ -4,8 +4,6 @@ Styled widget components for VoiceCast UI.
 Provides pre-styled widgets that follow the design system.
 """
 
-from typing import Optional
-
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox,
@@ -26,7 +24,6 @@ from gui.theme import (
     SPACING,
     TYPOGRAPHY,
     generate_button_style,
-    generate_card_style,
     generate_combobox_style,
     generate_groupbox_style,
     generate_label_style,
@@ -52,7 +49,7 @@ class StyledButton(QPushButton):
         self,
         text: str = "",
         variant: str = "primary",
-        parent: Optional[QWidget] = None,
+        parent: QWidget | None = None,
     ):
         super().__init__(text, parent)
         self._variant = variant
@@ -73,7 +70,7 @@ class StyledButton(QPushButton):
 class StyledGroupBox(QGroupBox):
     """Styled group box with depth effect."""
 
-    def __init__(self, title: str = "", parent: Optional[QWidget] = None):
+    def __init__(self, title: str = "", parent: QWidget | None = None):
         super().__init__(title, parent)
         self._apply_style()
         get_theme_manager().theme_changed.connect(self._apply_style)
@@ -98,7 +95,7 @@ class StyledSlider(QWidget):
         max_label: str = "",
         value_format: str = "{:.2f}",
         value_scale: float = 0.01,
-        parent: Optional[QWidget] = None,
+        parent: QWidget | None = None,
     ):
         super().__init__(parent)
         self._value_format = value_format
@@ -146,15 +143,19 @@ class StyledSlider(QWidget):
     def _apply_slider_style(self):
         palette = get_theme_manager().palette
         # Make sure the container widget is transparent
-        self.setStyleSheet(f"background-color: transparent;")
+        self.setStyleSheet("background-color: transparent;")
         self._slider.setStyleSheet(generate_slider_style())
         self._value_label.setStyleSheet(
             f"QLabel {{ color: {palette.accent}; font-weight: bold; font-size: {TYPOGRAPHY.size_md}px; background-color: transparent; }}"
         )
         if self._has_min_label:
-            self._min_label.setStyleSheet(f"QLabel {{ color: {palette.text_muted}; font-size: {TYPOGRAPHY.size_sm}px; background-color: transparent; }}")
+            self._min_label.setStyleSheet(
+                f"QLabel {{ color: {palette.text_muted}; font-size: {TYPOGRAPHY.size_sm}px; background-color: transparent; }}"
+            )
         if self._has_max_label:
-            self._max_label.setStyleSheet(f"QLabel {{ color: {palette.text_muted}; font-size: {TYPOGRAPHY.size_sm}px; background-color: transparent; }}")
+            self._max_label.setStyleSheet(
+                f"QLabel {{ color: {palette.text_muted}; font-size: {TYPOGRAPHY.size_sm}px; background-color: transparent; }}"
+            )
 
     def _on_value_changed(self, value: int):
         self._update_value_label()
@@ -184,7 +185,7 @@ class StyledSlider(QWidget):
 class StyledComboBox(QComboBox):
     """Styled combo box."""
 
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self._apply_style()
         get_theme_manager().theme_changed.connect(self._apply_style)
@@ -196,7 +197,7 @@ class StyledComboBox(QComboBox):
 class StyledTextEdit(QTextEdit):
     """Styled text edit with proper focus states."""
 
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self.setAcceptRichText(False)
         self._apply_style()
@@ -209,7 +210,7 @@ class StyledTextEdit(QTextEdit):
 class StyledProgressBar(QProgressBar):
     """Styled progress bar with accent color."""
 
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self._apply_style()
         get_theme_manager().theme_changed.connect(self._apply_style)
@@ -221,7 +222,7 @@ class StyledProgressBar(QProgressBar):
 class StyledTabWidget(QTabWidget):
     """Styled tab widget with accent indicators."""
 
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self._apply_style()
         get_theme_manager().theme_changed.connect(self._apply_style)
@@ -238,7 +239,7 @@ class StyledCard(QFrame):
     Subclasses should call _apply_style() after their own setup is complete.
     """
 
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self.setProperty("class", "card")
         # Don't call _apply_style here - let subclasses call it after setup
@@ -277,7 +278,7 @@ class StyledLabel(QLabel):
         self,
         text: str = "",
         role: str = "primary",
-        parent: Optional[QWidget] = None,
+        parent: QWidget | None = None,
     ):
         super().__init__(text, parent)
         self._role = role
@@ -304,7 +305,7 @@ class StatusLabel(QLabel):
         self,
         text: str = "",
         status: str = "info",
-        parent: Optional[QWidget] = None,
+        parent: QWidget | None = None,
     ):
         super().__init__(text, parent)
         self._status = status
@@ -329,7 +330,7 @@ class StatusLabel(QLabel):
             }}
         """)
 
-    def set_status(self, status: str, text: Optional[str] = None):
+    def set_status(self, status: str, text: str | None = None):
         """Change status and optionally text."""
         self._status = status
         if text is not None:
@@ -343,8 +344,8 @@ class IconLabel(QWidget):
     def __init__(
         self,
         text: str = "",
-        color: Optional[str] = None,
-        parent: Optional[QWidget] = None,
+        color: str | None = None,
+        parent: QWidget | None = None,
     ):
         super().__init__(parent)
         self._color = color
@@ -398,7 +399,7 @@ class SectionHeader(QWidget):
         self,
         title: str,
         subtitle: str = "",
-        parent: Optional[QWidget] = None,
+        parent: QWidget | None = None,
     ):
         super().__init__(parent)
 

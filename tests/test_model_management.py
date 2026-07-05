@@ -6,10 +6,10 @@ from unittest.mock import patch
 
 import pytest
 
-from models.model_info import ModelInfo
-from models.model_registry import ModelRegistry, get_registry
 from models.download_progress import DownloadProgress
 from models.exceptions import ModelDownloadError, ModelNotFoundError, ModelNotInstalledError
+from models.model_info import ModelInfo
+from models.model_registry import ModelRegistry, get_registry
 
 
 class TestModelInfo:
@@ -330,7 +330,13 @@ def test_voice_cloner_api_declares_explicit_model_management_methods():
     voice_cloner = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "VoiceCloner")
     method_names = {node.name for node in voice_cloner.body if isinstance(node, ast.FunctionDef)}
 
-    assert {"list_models", "is_model_installed", "download_model", "get_model_id_for_engine", "switch_engine"} <= method_names
+    assert {
+        "list_models",
+        "is_model_installed",
+        "download_model",
+        "get_model_id_for_engine",
+        "switch_engine",
+    } <= method_names
 
     init_func = _function_def("voice_cloner.py", "VoiceCloner", "__init__")
     default = _default_for_argument(init_func, "auto_download")

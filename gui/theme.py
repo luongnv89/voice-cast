@@ -10,7 +10,7 @@ from enum import Enum, auto
 from typing import Optional
 
 from PySide6.QtCore import QObject, QSettings, Signal
-from PySide6.QtGui import QColor, QPalette
+from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import QApplication
 
 
@@ -282,7 +282,7 @@ def get_theme_manager() -> ThemeManager:
 
 def generate_button_style(
     variant: str = "primary",
-    palette: Optional[ColorPalette] = None,
+    palette: ColorPalette | None = None,
 ) -> str:
     """
     Generate button stylesheet.
@@ -378,7 +378,7 @@ def generate_button_style(
         )
 
 
-def generate_groupbox_style(palette: Optional[ColorPalette] = None) -> str:
+def generate_groupbox_style(palette: ColorPalette | None = None) -> str:
     """Generate group box stylesheet with depth effect."""
     if palette is None:
         palette = get_theme_manager().palette
@@ -409,7 +409,7 @@ def generate_groupbox_style(palette: Optional[ColorPalette] = None) -> str:
     """
 
 
-def generate_slider_style(palette: Optional[ColorPalette] = None) -> str:
+def generate_slider_style(palette: ColorPalette | None = None) -> str:
     """Generate slider stylesheet with accent track."""
     if palette is None:
         palette = get_theme_manager().palette
@@ -450,7 +450,7 @@ def generate_slider_style(palette: Optional[ColorPalette] = None) -> str:
     """
 
 
-def generate_combobox_style(palette: Optional[ColorPalette] = None) -> str:
+def generate_combobox_style(palette: ColorPalette | None = None) -> str:
     """Generate combobox stylesheet."""
     if palette is None:
         palette = get_theme_manager().palette
@@ -500,7 +500,7 @@ def generate_combobox_style(palette: Optional[ColorPalette] = None) -> str:
     """
 
 
-def generate_textedit_style(palette: Optional[ColorPalette] = None) -> str:
+def generate_textedit_style(palette: ColorPalette | None = None) -> str:
     """Generate text edit stylesheet."""
     if palette is None:
         palette = get_theme_manager().palette
@@ -522,7 +522,7 @@ def generate_textedit_style(palette: Optional[ColorPalette] = None) -> str:
     """
 
 
-def generate_progressbar_style(palette: Optional[ColorPalette] = None) -> str:
+def generate_progressbar_style(palette: ColorPalette | None = None) -> str:
     """Generate progress bar stylesheet."""
     if palette is None:
         palette = get_theme_manager().palette
@@ -544,7 +544,7 @@ def generate_progressbar_style(palette: Optional[ColorPalette] = None) -> str:
     """
 
 
-def generate_tabwidget_style(palette: Optional[ColorPalette] = None) -> str:
+def generate_tabwidget_style(palette: ColorPalette | None = None) -> str:
     """Generate tab widget stylesheet."""
     if palette is None:
         palette = get_theme_manager().palette
@@ -584,7 +584,7 @@ def generate_tabwidget_style(palette: Optional[ColorPalette] = None) -> str:
     """
 
 
-def generate_scrollarea_style(palette: Optional[ColorPalette] = None) -> str:
+def generate_scrollarea_style(palette: ColorPalette | None = None) -> str:
     """Generate scroll area stylesheet."""
     if palette is None:
         palette = get_theme_manager().palette
@@ -633,7 +633,7 @@ def generate_scrollarea_style(palette: Optional[ColorPalette] = None) -> str:
     """
 
 
-def generate_card_style(palette: Optional[ColorPalette] = None) -> str:
+def generate_card_style(palette: ColorPalette | None = None) -> str:
     """Generate card component stylesheet."""
     if palette is None:
         palette = get_theme_manager().palette
@@ -653,7 +653,7 @@ def generate_card_style(palette: Optional[ColorPalette] = None) -> str:
 
 def generate_label_style(
     role: str = "primary",
-    palette: Optional[ColorPalette] = None,
+    palette: ColorPalette | None = None,
 ) -> str:
     """
     Generate label stylesheet.
@@ -685,7 +685,7 @@ def generate_label_style(
     """
 
 
-def generate_main_window_style(palette: Optional[ColorPalette] = None) -> str:
+def generate_main_window_style(palette: ColorPalette | None = None) -> str:
     """Generate main window stylesheet."""
     if palette is None:
         palette = get_theme_manager().palette

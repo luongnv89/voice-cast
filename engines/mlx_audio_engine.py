@@ -134,8 +134,7 @@ class MlxAudioEngine(TTSEngineBase):
         """
         if not is_apple_silicon():
             raise RuntimeError(
-                "MLX Audio requires Apple Silicon (M1/M2/M3/M4). "
-                "This engine is not available on your platform."
+                "MLX Audio requires Apple Silicon (M1/M2/M3/M4). " "This engine is not available on your platform."
             )
 
         super().__init__(speaker_wav, device)
@@ -181,9 +180,7 @@ class MlxAudioEngine(TTSEngineBase):
                 logger.info(f"MLX Audio {self.variant} model loaded successfully")
             except ImportError as e:
                 logger.error("mlx-audio package not installed. Install with: pip install mlx-audio")
-                raise ImportError(
-                    "mlx-audio package required. Install with: pip install -e '.[mlx]'"
-                ) from e
+                raise ImportError("mlx-audio package required. Install with: pip install -e '.[mlx]'") from e
         return self._model
 
     @property
@@ -219,9 +216,7 @@ class MlxAudioEngine(TTSEngineBase):
         else:
             return self._generate_csm(text, speed)
 
-    def _generate_kokoro(
-        self, text: str, voice: str, speed: float, lang_code: str
-    ) -> tuple[np.ndarray, int]:
+    def _generate_kokoro(self, text: str, voice: str, speed: float, lang_code: str) -> tuple[np.ndarray, int]:
         """Generate audio using Kokoro preset voices."""
         audio_data = None
 

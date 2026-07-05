@@ -7,7 +7,6 @@ implicitly.
 
 from voice_cloner import VoiceCloner
 
-
 MODEL_ID = "coqui-xtts-v2"
 ENGINE = "coqui"
 VOICE_SAMPLE = "./voice-samples/speaker.wav"
