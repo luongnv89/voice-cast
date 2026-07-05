@@ -91,6 +91,6 @@ def test_no_old_references_in_key_files():
             for context in contexts:
                 if context in line:
                     # These lines should not contain 'voice-cloner'
-                    assert "voice-cloner" not in line.lower(), (
-                        f"Found 'voice-cloner' in {filename}:{i + 1}: {line.strip()}"
-                    )
+                    assert (
+                        "voice-cloner" not in line.lower()
+                    ), f"Found 'voice-cloner' in {filename}:{i + 1}: {line.strip()}"
