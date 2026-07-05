@@ -71,10 +71,12 @@ jobs:
           pip install pytest pytest-cov
           # Install core dependencies (skip heavy ML packages for CI)
           pip install sounddevice soundfile rich numpy
+          # Install the project package (no deps — core ones are above)
+          pip install -e . --no-deps
 
       - name: Run tests
         run: |
-          pytest tests/ -v --tb=short || echo "Tests skipped - ML models not available in CI"
+          pytest tests/ -v --tb=short
 
   pre-commit:
     name: Pre-commit Hooks
