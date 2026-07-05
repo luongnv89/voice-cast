@@ -95,16 +95,29 @@ class TestDownloadProgress:
 class TestModelRegistry:
     """Tests for ModelRegistry."""
 
-    def test_singleton_pattern(self):
-        """Test that ModelRegistry is a singleton."""
-        registry1 = ModelRegistry()
-        registry2 = ModelRegistry()
-        assert registry1 is registry2
+    @pytest.fixture(autouse=True)
+    def _fresh_registry(self):
+        self.registry = ModelRegistry()
+        yield
+
+    def test_can_create_independent_instances(self):
+        """Test that ModelRegistry instances are isolated (no longer singleton)."""
+        reg_a = ModelRegistry()
+        reg_b = ModelRegistry()
+        assert reg_a is not reg_b
+
+    def test_isolated_instances_do_not_share_state(self):
+        """Test that modifying one registry doesn't affect another."""
+        reg_a = ModelRegistry()
+        reg_b = ModelRegistry()
+
+        reg_a.register_model(ModelInfo(id="custom-a", engine="test", name="Custom A", size_mb=1, description=""))
+        assert "custom-a" in reg_a.list_model_ids()
+        assert "custom-a" not in reg_b.list_model_ids()
 
     def test_list_models(self):
         """Test listing all models."""
-        registry = get_registry()
-        models = registry.list_models()
+        models = self.registry.list_models()
 
         assert len(models) >= 3
         model_ids = [m.id for m in models]
@@ -114,8 +127,7 @@ class TestModelRegistry:
 
     def test_get_model(self):
         """Test getting a specific model."""
-        registry = get_registry()
-        model = registry.get_model("coqui-xtts-v2")
+        model = self.registry.get_model("coqui-xtts-v2")
 
         assert model.id == "coqui-xtts-v2"
         assert model.engine == "coqui"
@@ -124,49 +136,60 @@ class TestModelRegistry:
 
     def test_get_nonexistent_model(self):
         """Test getting a model that doesn't exist."""
-        registry = get_registry()
-
         with pytest.raises(ModelNotFoundError) as exc_info:
-            registry.get_model("nonexistent-model")
+            self.registry.get_model("nonexistent-model")
 
         assert "nonexistent-model" in str(exc_info.value)
 
     def test_get_models_for_engine(self):
         """Test getting models for a specific engine."""
-        registry = get_registry()
-
-        coqui_models = registry.get_models_for_engine("coqui")
+        coqui_models = self.registry.get_models_for_engine("coqui")
         assert len(coqui_models) >= 1
         assert all(m.engine == "coqui" for m in coqui_models)
 
-        chatterbox_models = registry.get_models_for_engine("chatterbox")
+        chatterbox_models = self.registry.get_models_for_engine("chatterbox")
         assert len(chatterbox_models) >= 2
         assert all(m.engine == "chatterbox" for m in chatterbox_models)
 
     def test_get_engine_for_model(self):
         """Test getting engine name for a model."""
-        registry = get_registry()
-
-        assert registry.get_engine_for_model("coqui-xtts-v2") == "coqui"
-        assert registry.get_engine_for_model("chatterbox-turbo") == "chatterbox"
+        assert self.registry.get_engine_for_model("coqui-xtts-v2") == "coqui"
+        assert self.registry.get_engine_for_model("chatterbox-turbo") == "chatterbox"
 
     def test_get_model_id_for_public_engine_name(self):
         """Test mapping generation engine names to model IDs."""
-        registry = get_registry()
-
-        assert registry.get_model_id_for_engine("coqui") == "coqui-xtts-v2"
-        assert registry.get_model_id_for_engine("chatterbox-turbo") == "chatterbox-turbo"
-        assert registry.get_model_id_for_engine("chatterbox-standard") == "chatterbox-standard"
+        assert self.registry.get_model_id_for_engine("coqui") == "coqui-xtts-v2"
+        assert self.registry.get_model_id_for_engine("chatterbox-turbo") == "chatterbox-turbo"
+        assert self.registry.get_model_id_for_engine("chatterbox-standard") == "chatterbox-standard"
 
     def test_get_models_for_engine_accepts_groups_and_public_names(self):
         """Test model listing by engine group and public factory name."""
-        registry = get_registry()
-
-        chatterbox_models = registry.get_models_for_engine("chatterbox")
+        chatterbox_models = self.registry.get_models_for_engine("chatterbox")
         assert {m.id for m in chatterbox_models} >= {"chatterbox-turbo", "chatterbox-standard"}
 
-        turbo_models = registry.get_models_for_engine("chatterbox-turbo")
+        turbo_models = self.registry.get_models_for_engine("chatterbox-turbo")
         assert [m.id for m in turbo_models] == ["chatterbox-turbo"]
+
+    def test_reset_clears_and_reloads(self):
+        """Test reset restores registry to default state."""
+        self.registry.register_model(ModelInfo(id="custom", engine="test", name="Custom", size_mb=1, description=""))
+        assert "custom" in self.registry.list_model_ids()
+
+        self.registry.reset()
+        assert "custom" not in self.registry.list_model_ids()
+        assert "coqui-xtts-v2" in self.registry.list_model_ids()
+
+    def test_get_registry_function_returns_global_instance(self):
+        """Test that get_registry() returns a working ModelRegistry."""
+        r = get_registry()
+        assert isinstance(r, ModelRegistry)
+        assert "coqui-xtts-v2" in r.list_model_ids()
+
+    def test_di_through_constructor(self):
+        """Test that a custom registry can be injected into consumers."""
+        isolated = ModelRegistry()
+        isolated.register_model(ModelInfo(id="di-test", engine="test", name="DI Test", size_mb=5, description=""))
+        assert "di-test" in isolated.list_model_ids()
 
 
 class TestExceptions:

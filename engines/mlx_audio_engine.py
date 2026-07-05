@@ -12,7 +12,7 @@ from typing import Any, Literal
 import numpy as np
 
 from models.exceptions import ModelNotInstalledError
-from models.model_registry import get_registry
+from models.model_registry import ModelRegistry, get_registry
 from tts_engine_base import TTSEngineBase
 from utils.platform_utils import is_apple_silicon
 
@@ -117,6 +117,7 @@ class MlxAudioEngine(TTSEngineBase):
         device: str | None = None,
         variant: MlxVariant = "kokoro",
         auto_download: bool = False,
+        registry: ModelRegistry | None = None,
     ):
         """
         Initialize MLX Audio TTS engine.
@@ -128,6 +129,7 @@ class MlxAudioEngine(TTSEngineBase):
             auto_download: If True, allow the backend to download a missing model.
                           Defaults to False so generation never downloads models
                           unless the caller explicitly opts in.
+            registry: Model registry instance. Uses the global registry when None.
 
         Raises:
             RuntimeError: If not running on Apple Silicon.
@@ -142,7 +144,7 @@ class MlxAudioEngine(TTSEngineBase):
         self.auto_download = auto_download
         self._model = None
         self._sample_rate = 24000  # Kokoro default
-        self._registry = get_registry()
+        self._registry = registry or get_registry()
         self._model_id = MLX_MODEL_IDS.get(variant, "mlx-kokoro")
 
     @staticmethod
