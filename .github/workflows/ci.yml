@@ -71,6 +71,8 @@ jobs:
           pip install pytest pytest-cov
           # Install core dependencies (skip heavy ML packages for CI)
           pip install sounddevice soundfile rich numpy
+          # Install the project package (no deps — core ones are above)
+          pip install -e . --no-deps
 
       - name: Run tests
         run: |
