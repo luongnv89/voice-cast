@@ -20,6 +20,12 @@ class ChatterboxDownloader(BaseDownloader):
         "chatterbox-standard": "ResembleAI/chatterbox",
     }
 
+    # Pinned Hugging Face revisions for safe, reproducible downloads.
+    MODEL_REVISIONS = {
+        "chatterbox-turbo": "5bb1f6ee58e50c3b8d408bc82a6d3740c2db6e18",
+        "chatterbox-standard": "5bb1f6ee58e50c3b8d408bc82a6d3740c2db6e18",
+    }
+
     # Approximate sizes in bytes
     MODEL_SIZES = {
         "chatterbox-turbo": 350 * 1024 * 1024,  # ~350 MB
@@ -60,6 +66,7 @@ class ChatterboxDownloader(BaseDownloader):
             # Download the model into the same cache location the registry checks.
             cache_dir = snapshot_download(
                 repo_id=repo_id,
+                revision=self.MODEL_REVISIONS[model_id],
                 cache_dir=str(get_registry().get_cache_dir("chatterbox")),
             )
 

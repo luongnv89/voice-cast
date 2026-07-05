@@ -19,6 +19,11 @@ class MlxDownloader(BaseDownloader):
         "mlx-csm": "mlx-community/csm-1b",
     }
 
+    MODEL_REVISIONS = {
+        "mlx-kokoro": "a71e4d38b236d968966a2002c4c895dbd12b1c3c",
+        "mlx-csm": "5bf5ec118cf45fecc7b51198fd9f1a20a5aab65a",
+    }
+
     MODEL_SIZES = {
         "mlx-kokoro": 164 * 1024 * 1024,
         "mlx-csm": 2000 * 1024 * 1024,
@@ -53,7 +58,7 @@ class MlxDownloader(BaseDownloader):
         try:
             from huggingface_hub import snapshot_download
 
-            path = snapshot_download(repo_id=repo_id, cache_dir=str(cache_dir))
+            path = snapshot_download(repo_id=repo_id, revision=self.MODEL_REVISIONS[model_id], cache_dir=str(cache_dir))
         except ImportError as e:
             logger.error("huggingface_hub package not installed. Install with: pip install huggingface_hub")
             raise ImportError("huggingface_hub package required. Install with: pip install huggingface_hub") from e
