@@ -1,6 +1,9 @@
 """Tests for engine-specific control widgets."""
 
 import pytest
+
+pytest.importorskip("PySide6")
+
 from PySide6.QtCore import QCoreApplication
 
 from gui.engine_controls import (
