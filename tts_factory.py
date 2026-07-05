@@ -120,61 +120,71 @@ def _register_default_engines():
     try:
         from engines.coqui_engine import CoquiEngine
 
-        TTSFactory.register(EngineDescriptor(
-            name="coqui",
-            engine_class=CoquiEngine,
-            display_name="Coqui XTTS v2",
-            requires_reference_audio=True,
-            supports_preset_voices=False,
-        ))
+        TTSFactory.register(
+            EngineDescriptor(
+                name="coqui",
+                engine_class=CoquiEngine,
+                display_name="Coqui XTTS v2",
+                requires_reference_audio=True,
+                supports_preset_voices=False,
+            )
+        )
     except ImportError as e:
         logger.warning(f"Coqui engine not available: {e}")
 
     try:
         from engines.chatterbox_engine import ChatterboxEngine
 
-        TTSFactory.register(EngineDescriptor(
-            name="chatterbox-turbo",
-            engine_class=ChatterboxEngine,
-            display_name="Chatterbox Turbo (350M)",
-            requires_reference_audio=True,
-            supports_preset_voices=False,
-            default_kwargs={"variant": "turbo"},
-        ))
+        TTSFactory.register(
+            EngineDescriptor(
+                name="chatterbox-turbo",
+                engine_class=ChatterboxEngine,
+                display_name="Chatterbox Turbo (350M)",
+                requires_reference_audio=True,
+                supports_preset_voices=False,
+                default_kwargs={"variant": "turbo"},
+            )
+        )
 
-        TTSFactory.register(EngineDescriptor(
-            name="chatterbox-standard",
-            engine_class=ChatterboxEngine,
-            display_name="Chatterbox Standard (500M)",
-            requires_reference_audio=True,
-            supports_preset_voices=False,
-            default_kwargs={"variant": "standard"},
-        ))
+        TTSFactory.register(
+            EngineDescriptor(
+                name="chatterbox-standard",
+                engine_class=ChatterboxEngine,
+                display_name="Chatterbox Standard (500M)",
+                requires_reference_audio=True,
+                supports_preset_voices=False,
+                default_kwargs={"variant": "standard"},
+            )
+        )
     except ImportError as e:
         logger.warning(f"Chatterbox engines not available: {e}")
 
     try:
         from engines.mlx_audio_engine import MlxAudioEngine
 
-        TTSFactory.register(EngineDescriptor(
-            name="mlx-kokoro",
-            engine_class=MlxAudioEngine,
-            display_name="MLX Kokoro (Preset Voices)",
-            requires_reference_audio=False,
-            supports_preset_voices=True,
-            platform_restriction="apple_silicon",
-            default_kwargs={"variant": "kokoro"},
-        ))
+        TTSFactory.register(
+            EngineDescriptor(
+                name="mlx-kokoro",
+                engine_class=MlxAudioEngine,
+                display_name="MLX Kokoro (Preset Voices)",
+                requires_reference_audio=False,
+                supports_preset_voices=True,
+                platform_restriction="apple_silicon",
+                default_kwargs={"variant": "kokoro"},
+            )
+        )
 
-        TTSFactory.register(EngineDescriptor(
-            name="mlx-csm",
-            engine_class=MlxAudioEngine,
-            display_name="MLX CSM (Voice Cloning)",
-            requires_reference_audio=True,
-            supports_preset_voices=False,
-            platform_restriction="apple_silicon",
-            default_kwargs={"variant": "csm"},
-        ))
+        TTSFactory.register(
+            EngineDescriptor(
+                name="mlx-csm",
+                engine_class=MlxAudioEngine,
+                display_name="MLX CSM (Voice Cloning)",
+                requires_reference_audio=True,
+                supports_preset_voices=False,
+                platform_restriction="apple_silicon",
+                default_kwargs={"variant": "csm"},
+            )
+        )
     except ImportError as e:
         logger.warning(f"MLX Audio engines not available: {e}")
 

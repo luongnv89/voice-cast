@@ -26,8 +26,7 @@ class StubEngine:
         self.kwargs = kwargs
         self.name = "stub"
 
-    def generate(self, text, **kwargs):
-        ...
+    def generate(self, text, **kwargs): ...
 
     def get_supported_parameters(self):
         return []
@@ -124,12 +123,14 @@ class TestTTSFactoryCreate:
         assert engine.device == "cpu"
 
     def test_merges_default_and_custom_kwargs(self):
-        TTSFactory.register(EngineDescriptor(
-            name="custom",
-            engine_class=StubEngine,
-            display_name="Custom",
-            default_kwargs={"variant": "turbo", "speed": 1.0},
-        ))
+        TTSFactory.register(
+            EngineDescriptor(
+                name="custom",
+                engine_class=StubEngine,
+                display_name="Custom",
+                default_kwargs={"variant": "turbo", "speed": 1.0},
+            )
+        )
         engine = TTSFactory.create("custom", speaker_wav="v.wav", speed=2.0)
         assert engine.kwargs == {"variant": "turbo", "speed": 2.0}
 
