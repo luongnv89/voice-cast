@@ -17,6 +17,7 @@ class EngineDescriptor:
     supports_preset_voices: bool = False
     platform_restriction: str | None = None
     default_kwargs: dict[str, Any] = field(default_factory=dict)
+    controls_class: type | None = None
 
     def is_available_on_platform(self) -> bool:
         return not (self.platform_restriction == "apple_silicon" and not is_apple_silicon())
@@ -105,6 +106,11 @@ class TTSFactory:
         }
 
     @classmethod
+    def get_controls_class(cls, engine_name: str) -> type | None:
+        descriptor = cls._registry.get(engine_name)
+        return descriptor.controls_class if descriptor else None
+
+    @classmethod
     def get_default_engine(cls) -> str:
         available = cls.get_available_engines()
         if not available:
@@ -119,6 +125,7 @@ class TTSFactory:
 def _register_default_engines():
     try:
         from engines.coqui_engine import CoquiEngine
+        from gui.engine_controls import CoquiControls
 
         TTSFactory.register(
             EngineDescriptor(
@@ -127,6 +134,7 @@ def _register_default_engines():
                 display_name="Coqui XTTS v2",
                 requires_reference_audio=True,
                 supports_preset_voices=False,
+                controls_class=CoquiControls,
             )
         )
     except ImportError as e:
@@ -134,6 +142,7 @@ def _register_default_engines():
 
     try:
         from engines.chatterbox_engine import ChatterboxEngine
+        from gui.engine_controls import ChatterboxControls
 
         TTSFactory.register(
             EngineDescriptor(
@@ -143,6 +152,7 @@ def _register_default_engines():
                 requires_reference_audio=True,
                 supports_preset_voices=False,
                 default_kwargs={"variant": "turbo"},
+                controls_class=ChatterboxControls,
             )
         )
 
@@ -154,6 +164,7 @@ def _register_default_engines():
                 requires_reference_audio=True,
                 supports_preset_voices=False,
                 default_kwargs={"variant": "standard"},
+                controls_class=ChatterboxControls,
             )
         )
     except ImportError as e:
@@ -161,6 +172,7 @@ def _register_default_engines():
 
     try:
         from engines.mlx_audio_engine import MlxAudioEngine
+        from gui.engine_controls import MlxCsmControls, MlxKokoroControls
 
         TTSFactory.register(
             EngineDescriptor(
@@ -171,6 +183,7 @@ def _register_default_engines():
                 supports_preset_voices=True,
                 platform_restriction="apple_silicon",
                 default_kwargs={"variant": "kokoro"},
+                controls_class=MlxKokoroControls,
             )
         )
 
@@ -183,6 +196,7 @@ def _register_default_engines():
                 supports_preset_voices=False,
                 platform_restriction="apple_silicon",
                 default_kwargs={"variant": "csm"},
+                controls_class=MlxCsmControls,
             )
         )
     except ImportError as e:

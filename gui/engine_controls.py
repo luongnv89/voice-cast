@@ -14,6 +14,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+# Source-of-truth voice data from MlxAudioEngine
+from engines.mlx_audio_engine import KOKORO_LANG_CODES, KOKORO_VOICES
 from gui.styled_widgets import (
     StyledButton,
     StyledComboBox,
@@ -22,6 +24,7 @@ from gui.styled_widgets import (
     StyledSlider,
 )
 from gui.theme import SPACING
+from tts_factory import TTSFactory
 
 
 class EngineControlsBase(QWidget):
@@ -218,84 +221,11 @@ class ChatterboxControls(EngineControlsBase):
 class MlxKokoroControls(EngineControlsBase):
     """Control widget for MLX Kokoro preset voices."""
 
-    # Voice presets organized by language and category
-    VOICE_GROUPS = {
-        "American English": {
-            "Female": [
-                ("af_heart", "Heart (Warm)"),
-                ("af_alloy", "Alloy"),
-                ("af_aoede", "Aoede"),
-                ("af_bella", "Bella"),
-                ("af_jessica", "Jessica"),
-                ("af_kore", "Kore"),
-                ("af_nicole", "Nicole"),
-                ("af_nova", "Nova"),
-                ("af_river", "River"),
-                ("af_sarah", "Sarah"),
-                ("af_sky", "Sky"),
-            ],
-            "Male": [
-                ("am_adam", "Adam"),
-                ("am_echo", "Echo"),
-                ("am_eric", "Eric"),
-                ("am_fenrir", "Fenrir"),
-                ("am_liam", "Liam"),
-                ("am_michael", "Michael"),
-                ("am_onyx", "Onyx"),
-                ("am_puck", "Puck"),
-                ("am_santa", "Santa"),
-            ],
-        },
-        "British English": {
-            "Female": [
-                ("bf_alice", "Alice"),
-                ("bf_emma", "Emma"),
-                ("bf_isabella", "Isabella"),
-                ("bf_lily", "Lily"),
-            ],
-            "Male": [
-                ("bm_daniel", "Daniel"),
-                ("bm_fable", "Fable"),
-                ("bm_george", "George"),
-                ("bm_lewis", "Lewis"),
-            ],
-        },
-        "Japanese": {
-            "Female": [
-                ("jf_alpha", "Alpha"),
-                ("jf_gongitsune", "Gongitsune"),
-                ("jf_nezumi", "Nezumi"),
-                ("jf_tebukuro", "Tebukuro"),
-            ],
-            "Male": [
-                ("jm_kumo", "Kumo"),
-            ],
-        },
-        "Mandarin Chinese": {
-            "Female": [
-                ("zf_xiaobei", "Xiaobei"),
-                ("zf_xiaoni", "Xiaoni"),
-                ("zf_xiaoxiao", "Xiaoxiao"),
-                ("zf_xiaoyi", "Xiaoyi"),
-            ],
-            "Male": [
-                ("zm_yunjian", "Yunjian"),
-                ("zm_yunxi", "Yunxi"),
-                ("zm_yunxia", "Yunxia"),
-                ("zm_yunyang", "Yunyang"),
-            ],
-        },
-    }
+    # Voice data sourced from MlxAudioEngine (single source of truth)
+    VOICE_GROUPS = KOKORO_VOICES
+    LANG_CODES = KOKORO_LANG_CODES
 
-    # Language code mappings for Kokoro
-    LANG_CODES = {
-        "American English": "a",
-        "British English": "b",
-        "Japanese": "j",
-        "Mandarin Chinese": "z",
-    }
-
-    def __init__(self):
+    def __init__(self, **kwargs):
         super().__init__()
 
     def _setup_ui(self):
@@ -420,7 +350,7 @@ class MlxKokoroControls(EngineControlsBase):
 class MlxCsmControls(EngineControlsBase):
     """Control widget for MLX CSM voice cloning."""
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         super().__init__()
 
     def _setup_ui(self):
@@ -473,22 +403,18 @@ class EngineControlsFactory:
         """
         Create control widget for the specified engine.
 
+        Looks up the registered EngineDescriptor from TTSFactory
+        and instantiates its associated controls_class.
+
         Args:
             engine_name: Engine identifier (e.g., "coqui", "chatterbox-turbo")
 
         Returns:
             EngineControlsBase widget instance
         """
-        if engine_name == "coqui":
-            return CoquiControls()
-        elif engine_name == "chatterbox-turbo":
-            return ChatterboxControls(variant="turbo")
-        elif engine_name == "chatterbox-standard":
-            return ChatterboxControls(variant="standard")
-        elif engine_name == "mlx-kokoro":
-            return MlxKokoroControls()
-        elif engine_name == "mlx-csm":
-            return MlxCsmControls()
-        else:
-            # Return empty widget for unknown engines
-            return EngineControlsBase()
+        controls_class = TTSFactory.get_controls_class(engine_name)
+        if controls_class is not None:
+            descriptor = TTSFactory._registry.get(engine_name)
+            kwargs = dict(descriptor.default_kwargs) if descriptor else {}
+            return controls_class(**kwargs)
+        return EngineControlsBase()
