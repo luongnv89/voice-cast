@@ -18,6 +18,7 @@ def qapp():
     app = QCoreApplication.instance()
     if app is None:
         from PySide6.QtWidgets import QApplication
+
         app = QApplication([])
     return app
 
