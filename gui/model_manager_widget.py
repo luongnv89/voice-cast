@@ -8,6 +8,7 @@ from PySide6.QtCore import QThread, Signal, Slot
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QHBoxLayout,
+    QLabel,
     QMessageBox,
     QScrollArea,
     QVBoxLayout,
@@ -32,6 +33,10 @@ from models import DownloadProgress, ModelDownloader, ModelRegistry
 from models.model_info import ModelInfo
 
 
+class CancelledError(Exception):
+    """Raised when a download is cancelled by the user."""
+
+
 class ModelDownloadThread(QThread):
     """Thread for downloading models without blocking the UI."""
 
@@ -49,7 +54,7 @@ class ModelDownloadThread(QThread):
 
             def progress_callback(progress: DownloadProgress):
                 if self.isInterruptionRequested():
-                    raise RuntimeError("Download cancelled")
+                    raise CancelledError()
                 self.progress_updated.emit(
                     progress.model_id or self.model_id,
                     progress.downloaded_bytes,
@@ -60,6 +65,8 @@ class ModelDownloadThread(QThread):
             self._downloader.download(self.model_id, progress_callback=progress_callback)
             if not self.isInterruptionRequested():
                 self.download_complete.emit(self.model_id)
+        except CancelledError:
+            pass
         except Exception as e:
             if not self.isInterruptionRequested():
                 self.download_error.emit(self.model_id, str(e))
@@ -126,6 +133,7 @@ class ModelCard(StyledCard):
         action_layout.addWidget(self.download_btn)
 
         self.progress_bar = StyledProgressBar()
+        self.progress_bar.setAccessibleName(f"Download progress for {self.model.id}")
         self.progress_bar.setFixedWidth(110)
         self.progress_bar.setVisible(False)
         action_layout.addWidget(self.progress_bar)
@@ -252,18 +260,11 @@ class EngineSection(QWidget):
         layout.setContentsMargins(0, 0, 0, SPACING.md)
         layout.setSpacing(SPACING.sm)
 
-        # Engine header
-        palette = get_theme_manager().palette
-        header = StyledLabel(self._engine_name.upper(), role="accent")
-        header.setStyleSheet(f"""
-            font-size: {TYPOGRAPHY.size_sm}px;
-            font-weight: bold;
-            color: {palette.accent};
-            letter-spacing: 1px;
-            padding: {SPACING.xs}px 0;
-            border-bottom: 1px solid {palette.border_secondary};
-        """)
-        layout.addWidget(header)
+        # Engine header (plain QLabel to avoid StyledLabel theme override)
+        self._header = QLabel(self._engine_name.upper())
+        self._apply_header_style()
+        layout.addWidget(self._header)
+        get_theme_manager().theme_changed.connect(self._apply_header_style)
 
         # Model cards
         for model in self._models:
@@ -271,6 +272,18 @@ class EngineSection(QWidget):
             card.download_requested.connect(self.download_requested.emit)
             self._cards[model.id] = card
             layout.addWidget(card)
+
+    def _apply_header_style(self):
+        """Apply the full custom header stylesheet (theme-aware)."""
+        palette = get_theme_manager().palette
+        self._header.setStyleSheet(f"""
+            font-size: {TYPOGRAPHY.size_sm}px;
+            font-weight: bold;
+            color: {palette.accent};
+            letter-spacing: 1px;
+            padding: {SPACING.xs}px 0;
+            border-bottom: 1px solid {palette.border_secondary};
+        """)
 
     def get_card(self, model_id: str) -> ModelCard | None:
         """Get a model card by ID."""

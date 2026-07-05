@@ -165,6 +165,11 @@ class VoiceCloningApp(QMainWindow):
         """Handle theme change."""
         self._update_theme_menu_state()
 
+    def _on_tab_changed(self, index: int):
+        """Refresh model status when Model Manager tab is activated."""
+        if self.tab_widget.widget(index) == self.model_manager:
+            self.model_manager._refresh_models()
+
     def closeEvent(self, event):
         """Clean up resources when window closes."""
         # Stop any playing audio
@@ -209,6 +214,7 @@ class VoiceCloningApp(QMainWindow):
         # Create Model Manager tab
         self.model_manager = ModelManagerWidget()
         self.tab_widget.addTab(self.model_manager, "Model Manager")
+        self.tab_widget.currentChanged.connect(self._on_tab_changed)
 
     def _setup_voice_tab(self, tab_widget: QWidget):
         """Set up the voice cloning tab."""
@@ -284,6 +290,7 @@ class VoiceCloningApp(QMainWindow):
 
         # Activity indicator
         self.progress_bar = QProgressBar()
+        self.progress_bar.setAccessibleName("Generation progress")
         self.progress_bar.setRange(0, 0)  # indeterminate
         self.progress_bar.setFixedHeight(20)
         self.progress_bar.hide()
