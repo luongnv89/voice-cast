@@ -12,7 +12,12 @@ logger = logging.getLogger("voice_cloner.models")
 
 
 class ModelRegistry:
-    """Registry for managing TTS model metadata and installation status."""
+    """Registry for managing TTS model metadata and installation status.
+
+    No longer a singleton — each instance owns its own model state.
+    Use the module-level :func:`get_registry` for the default instance in
+    production code, or construct isolated instances in tests.
+    """
 
     # Public engine names used by the factory/CLI mapped to registry model IDs.
     _ENGINE_MODEL_IDS: dict[str, str] = {
@@ -74,20 +79,8 @@ class ModelRegistry:
         ),
     ]
 
-    _instance = None
-
-    def __new__(cls):
-        """Singleton pattern for global registry access."""
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._initialized = False
-        return cls._instance
-
     def __init__(self):
-        """Initialize the registry."""
-        if self._initialized:
-            return
-
+        """Initialize the registry with default models."""
         self._models: dict[str, ModelInfo] = {}
         self._cache_dirs: dict[str, Path] = {}
 
@@ -97,7 +90,6 @@ class ModelRegistry:
 
         # Set up cache directories
         self._setup_cache_dirs()
-        self._initialized = True
 
     def _setup_cache_dirs(self):
         """Set up cache directory paths for each engine."""
@@ -216,6 +208,18 @@ class ModelRegistry:
         """Get the engine name for a model."""
         model = self.get_model(model_id)
         return model.engine
+
+    def reset(self):
+        """Reset the registry to its default state.
+
+        Useful for test isolation — clears all registered models and
+        cache directories, then reloads defaults.
+        """
+        self._models.clear()
+        self._cache_dirs.clear()
+        for model in self._DEFAULT_MODELS:
+            self._models[model.id] = model
+        self._setup_cache_dirs()
 
 
 # Global registry instance

@@ -7,7 +7,7 @@ import numpy as np
 import soundfile as sf
 
 from models.exceptions import ModelNotInstalledError
-from models.model_registry import get_registry
+from models.model_registry import ModelRegistry, get_registry
 from tts_engine_base import TTSEngineBase
 
 logger = logging.getLogger("voice_cloner.coqui")
@@ -51,6 +51,7 @@ class CoquiEngine(TTSEngineBase):
         device: str | None = None,
         model_name: str = "tts_models/multilingual/multi-dataset/xtts_v2",
         auto_download: bool = False,
+        registry: ModelRegistry | None = None,
     ):
         """
         Initialize Coqui TTS engine.
@@ -62,12 +63,13 @@ class CoquiEngine(TTSEngineBase):
             auto_download: If True, allow the backend to download a missing model.
                           Defaults to False so generation never downloads models
                           unless the caller explicitly opts in.
+            registry: Model registry instance. Uses the global registry when None.
         """
         super().__init__(speaker_wav, device)
         self.model_name = model_name
         self.auto_download = auto_download
         self._tts = None  # Lazy loading
-        self._registry = get_registry()
+        self._registry = registry or get_registry()
 
     def _check_model_installed(self) -> bool:
         """Check if the model is installed."""

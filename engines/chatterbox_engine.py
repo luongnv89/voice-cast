@@ -5,7 +5,7 @@ from typing import Any, Literal
 import numpy as np
 
 from models.exceptions import ModelNotInstalledError
-from models.model_registry import get_registry
+from models.model_registry import ModelRegistry, get_registry
 from tts_engine_base import TTSEngineBase
 
 logger = logging.getLogger("voice_cloner.chatterbox")
@@ -34,6 +34,7 @@ class ChatterboxEngine(TTSEngineBase):
         device: str | None = None,
         variant: ChatterboxVariant = "turbo",
         auto_download: bool = False,
+        registry: ModelRegistry | None = None,
     ):
         """
         Initialize Chatterbox TTS engine.
@@ -45,13 +46,14 @@ class ChatterboxEngine(TTSEngineBase):
             auto_download: If True, allow the backend to download a missing model.
                           Defaults to False so generation never downloads models
                           unless the caller explicitly opts in.
+            registry: Model registry instance. Uses the global registry when None.
         """
         super().__init__(speaker_wav, device)
         self.variant = variant
         self.auto_download = auto_download
         self._model = None  # Lazy loading
         self._sample_rate = None
-        self._registry = get_registry()
+        self._registry = registry or get_registry()
         self._model_id = CHATTERBOX_MODEL_IDS.get(variant, "chatterbox-turbo")
 
     def _check_model_installed(self) -> bool:

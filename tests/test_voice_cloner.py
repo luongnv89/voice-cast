@@ -23,6 +23,8 @@ for _mod in (
 ):
     sys.modules[_mod] = MagicMock()
 
+from models.model_info import ModelInfo  # noqa: E402
+from models.model_registry import ModelRegistry  # noqa: E402
 from voice_cloner import VoiceCloner  # noqa: E402
 
 
@@ -142,3 +144,65 @@ class TestSavedAudioReadback:
         ):
             cloner.say("explicit", play_audio=False, save_audio=True, output_file=out)
             assert os.path.exists(os.path.dirname(out))
+
+
+class TestInjectedRegistry:
+    """Tests for injected ModelRegistry in VoiceCloner."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self):
+        self.isolated_registry = ModelRegistry()
+        self.isolated_registry.register_model(
+            ModelInfo(id="custom-only", engine="custom", name="Custom Only", size_mb=1, description="DI test")
+        )
+
+    def test_list_models_accepts_injected_registry(self):
+        models = VoiceCloner.list_models(registry=self.isolated_registry)
+        model_ids = [m.id for m in models]
+        assert "custom-only" in model_ids
+
+    def test_list_models_without_registry_uses_global(self):
+        models = VoiceCloner.list_models()
+        model_ids = [m.id for m in models]
+        assert "custom-only" not in model_ids
+        assert "coqui-xtts-v2" in model_ids
+
+    def test_is_model_installed_accepts_injected_registry(self):
+        result = VoiceCloner.is_model_installed("custom-only", registry=self.isolated_registry)
+        assert result is False  # custom-only has no path checker, so not installed
+
+    def test_get_model_id_for_engine_accepts_injected_registry(self):
+        self.isolated_registry.register_model(
+            ModelInfo(id="custom-model", engine="custom", name="Custom", size_mb=1, description="")
+        )
+        # Manually set the engine model ID mapping
+
+        result = VoiceCloner.get_model_id_for_engine("custom-model", registry=self.isolated_registry)
+        assert result == "custom-model"
+
+    def test_constructor_passes_registry_to_engine(self):
+        from unittest.mock import MagicMock
+
+        from models.model_info import ModelInfo
+
+        # Register the engine metadata in TTSFactory so VoiceCloner doesn't error
+        self.isolated_registry.register_model(
+            ModelInfo(id="mlx-kokoro", engine="mlx-audio", name="MLX Kokoro", size_mb=164, description="")
+        )
+
+        eng = MagicMock()
+        eng.generate.return_value = (np.array([0.1], dtype=np.float32), 22050)
+        eng.name = "custom_engine"
+
+        with (
+            patch("voice_cloner.TTSFactory.create", return_value=eng) as mock_create,
+            patch("voice_cloner.TTSFactory.get_engine_metadata", return_value={"requires_reference_audio": False}),
+        ):
+            VoiceCloner(
+                speaker_wav="dummy.wav",
+                engine="coqui",
+                device="cpu",
+                registry=self.isolated_registry,
+            )
+            _, kwargs = mock_create.call_args
+            assert kwargs.get("registry") is self.isolated_registry

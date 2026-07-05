@@ -5,7 +5,7 @@ from pathlib import Path
 
 from models.download_progress import DownloadProgress, ProgressCallback
 from models.exceptions import ModelDownloadError, ModelNotFoundError
-from models.model_registry import get_registry
+from models.model_registry import ModelRegistry, get_registry
 
 logger = logging.getLogger("voice_cloner.models")
 
@@ -13,8 +13,8 @@ logger = logging.getLogger("voice_cloner.models")
 class ModelDownloader:
     """Orchestrates model downloads with progress reporting."""
 
-    def __init__(self):
-        self._registry = get_registry()
+    def __init__(self, registry: ModelRegistry | None = None):
+        self._registry = registry or get_registry()
         self._downloaders: dict[str, object] = {}
 
     def download(

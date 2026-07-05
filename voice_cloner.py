@@ -9,8 +9,9 @@ from rich.console import Console
 from rich.logging import RichHandler
 from transformers import logging as transformers_logging
 
-from models import ModelDownloader, ModelInfo, ModelRegistry
+from models import ModelDownloader, ModelInfo
 from models.download_progress import ProgressCallback
+from models.model_registry import ModelRegistry, get_registry
 from tts_engine_base import TTSEngineBase
 from tts_factory import TTSFactory
 
@@ -43,6 +44,7 @@ class VoiceCloner:
         engine: str | TTSEngineBase | None = None,
         device: str | None = None,
         auto_download: bool = False,
+        registry: ModelRegistry | None = None,
         **engine_kwargs,
     ):
         """
@@ -55,11 +57,13 @@ class VoiceCloner:
             device: Device to use ("cuda" or "cpu"). Auto-detected if None.
             auto_download: Explicit opt-in for backend model downloads. Defaults
                 to False so model files are never downloaded during generation.
+            registry: Model registry instance. Uses the global registry when None.
             **engine_kwargs: Additional parameters passed to engine constructor.
         """
         self.speaker_wav = speaker_wav
         self.device = device
         self.auto_download = auto_download
+        self._registry = registry or get_registry()
 
         # Create or use provided engine
         if engine is None:
@@ -81,6 +85,7 @@ class VoiceCloner:
 
         if isinstance(engine, str):
             engine_kwargs.setdefault("auto_download", auto_download)
+            engine_kwargs.setdefault("registry", self._registry)
             self.engine = TTSFactory.create(engine_name=engine, speaker_wav=speaker_wav, device=device, **engine_kwargs)
             self.engine_name = engine
         else:
@@ -207,28 +212,36 @@ class VoiceCloner:
         return TTSFactory.get_engine_info()
 
     @staticmethod
-    def list_models() -> list[ModelInfo]:
+    def list_models(registry: ModelRegistry | None = None) -> list[ModelInfo]:
         """List available models with current cache status."""
-        return ModelRegistry().list_models()
+        r = registry or get_registry()
+        return r.list_models()
 
     @staticmethod
-    def is_model_installed(model_id: str) -> bool:
+    def is_model_installed(model_id: str, registry: ModelRegistry | None = None) -> bool:
         """Return whether a model is present in the local cache."""
-        return ModelRegistry().is_installed(model_id)
+        r = registry or get_registry()
+        return r.is_installed(model_id)
 
     @staticmethod
-    def download_model(model_id: str, progress_callback: ProgressCallback | None = None):
+    def download_model(
+        model_id: str,
+        progress_callback: ProgressCallback | None = None,
+        registry: ModelRegistry | None = None,
+    ):
         """Explicitly download a model and return its local path."""
-        return ModelDownloader().download(model_id, progress_callback=progress_callback)
+        return ModelDownloader(registry=registry).download(model_id, progress_callback=progress_callback)
 
     @staticmethod
-    def get_model_id_for_engine(engine_name: str) -> str:
+    def get_model_id_for_engine(engine_name: str, registry: ModelRegistry | None = None) -> str:
         """Return the default model ID for a public engine name."""
-        return ModelRegistry().get_model_id_for_engine(engine_name)
+        r = registry or get_registry()
+        return r.get_model_id_for_engine(engine_name)
 
     def switch_engine(self, engine: str, **engine_kwargs) -> None:
         """Switch this cloner to another engine/model without implicit downloads."""
         engine_kwargs.setdefault("auto_download", self.auto_download)
+        engine_kwargs.setdefault("registry", self._registry)
         self.engine = TTSFactory.create(
             engine_name=engine,
             speaker_wav=self.speaker_wav,
