@@ -29,9 +29,27 @@ class EngineControlsBase(QWidget):
 
     parameters_changed = Signal(dict)
 
+    def __init__(self):
+        super().__init__()
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(SPACING.md)
+
+        info_label = StyledLabel(
+            "No engine-specific controls available.",
+            role="muted",
+        )
+        info_label.setWordWrap(True)
+        layout.addWidget(info_label)
+
+        layout.addStretch()
+
     def get_parameters(self) -> dict[str, Any]:
         """Return current parameter values."""
-        raise NotImplementedError
+        return {}
 
 
 class CoquiControls(EngineControlsBase):
@@ -58,7 +76,6 @@ class CoquiControls(EngineControlsBase):
 
     def __init__(self):
         super().__init__()
-        self._setup_ui()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -115,9 +132,8 @@ class ChatterboxControls(EngineControlsBase):
     PARALINGUISTIC_TAGS = ["laugh", "chuckle", "cough", "sigh", "gasp", "yawn"]
 
     def __init__(self, variant: str = "turbo"):
-        super().__init__()
         self.variant = variant
-        self._setup_ui()
+        super().__init__()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -281,7 +297,6 @@ class MlxKokoroControls(EngineControlsBase):
 
     def __init__(self):
         super().__init__()
-        self._setup_ui()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -407,7 +422,6 @@ class MlxCsmControls(EngineControlsBase):
 
     def __init__(self):
         super().__init__()
-        self._setup_ui()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
