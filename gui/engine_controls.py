@@ -225,7 +225,7 @@ class MlxKokoroControls(EngineControlsBase):
     VOICE_GROUPS = KOKORO_VOICES
     LANG_CODES = KOKORO_LANG_CODES
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         super().__init__()
 
     def _setup_ui(self):
@@ -350,7 +350,7 @@ class MlxKokoroControls(EngineControlsBase):
 class MlxCsmControls(EngineControlsBase):
     """Control widget for MLX CSM voice cloning."""
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         super().__init__()
 
     def _setup_ui(self):
