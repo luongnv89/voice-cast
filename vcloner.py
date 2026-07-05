@@ -9,7 +9,7 @@ from rich.table import Table
 
 from models import DownloadProgress, ModelDownloader, ModelRegistry
 from models.exceptions import ModelNotInstalledError
-from tts_factory import TTSFactory
+from tts_factory import TTSFactory, bootstrap_engines
 from voice_cloner import VoiceCloner
 
 # Configure logging with Rich for a better terminal experience
@@ -102,6 +102,8 @@ def download_models(model_ids: list[str], engine: str | None = None):
 
 
 def main():
+    bootstrap_engines()
+
     # Get available engines for help text
     available_engines = TTSFactory.available_engines()
     model_engine_groups = ["chatterbox", "mlx-audio"]
