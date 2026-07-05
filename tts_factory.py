@@ -67,7 +67,7 @@ class TTSFactory:
         """
         if engine_name not in cls._registry:
             available = list(cls._registry.keys())
-            raise ValueError(f"Unknown engine: '{engine_name}'. " f"Available engines: {available}")
+            raise ValueError(f"Unknown engine: '{engine_name}'. Available engines: {available}")
 
         engine_class, default_kwargs = cls._registry[engine_name]
 

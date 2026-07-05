@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "updated": "2026-07-05T00:00:00Z",
+  "source": "/issue-triage",
+  "analyzed_count": 3,
+  "issues": [
+    {
+      "number": 5,
+      "title": "Implement proper model management with dynamic loading",
+      "type": "feature",
+      "priority": "P2",
+      "blocks": [3, 4],
+      "blocked_by": [],
+      "status": "ready",
+      "stale_days": null,
+      "labels": ["enhancement"],
+      "affected_files": [
+        "models/model_registry.py",
+        "models/model_downloader.py",
+        "models/model_info.py",
+        "models/exceptions.py",
+        "models/downloaders/coqui_downloader.py",
+        "models/downloaders/chatterbox_downloader.py",
+        "models/downloaders/base.py",
+        "vcloner.py",
+        "gui/model_manager_widget.py",
+        "voice_cloning_app.py",
+        "engines/coqui_engine.py",
+        "engines/chatterbox_engine.py",
+        "engines/mlx_audio_engine.py",
+        "tests/test_model_management.py"
+      ],
+      "updated_at": "2026-04-28T21:22:39Z",
+      "potentially_fixed_by": null
+    },
+    {
+      "number": 3,
+      "title": "Add pocket tts",
+      "type": "feature",
+      "priority": "P3",
+      "blocks": [],
+      "blocked_by": [5],
+      "status": "stale (169d)",
+      "stale_days": 169,
+      "labels": [],
+      "affected_files": [
+        "engines/mlx_audio_engine.py",
+        "tts_factory.py",
+        "tts_engine_base.py",
+        "models/model_registry.py",
+        "pyproject.toml",
+        "engines/__init__.py"
+      ],
+      "updated_at": "2026-01-17T19:50:49Z",
+      "potentially_fixed_by": null
+    },
+    {
+      "number": 4,
+      "title": "Create proper CLI tool and publish to PyPI",
+      "type": "feature",
+      "priority": "P3",
+      "blocks": [],
+      "blocked_by": [5],
+      "status": "stale (68d)",
+      "stale_days": 68,
+      "labels": ["enhancement", "cli"],
+      "affected_files": [
+        "vcloner.py",
+        "pyproject.toml",
+        "README.md"
+      ],
+      "updated_at": "2026-04-28T21:21:11Z",
+      "potentially_fixed_by": null
+    }
+  ],
+  "summary": {
+    "parallel_groups": [],
+    "stale_count": 3,
+    "stale_threshold_days": 7,
+    "potentially_fixed_count": 0,
+    "suggested_order": [5, 3, 4],
+    "circular_deps": []
+  },
+  "history": [
+    {
+      "time": "2026-07-05T00:00:00Z",
+      "source": "/issue-triage",
+      "changes": "Full re-triage (3 issues)"
+    }
+  ]
+}

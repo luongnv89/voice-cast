@@ -193,6 +193,6 @@ class ChatterboxEngine(TTSEngineBase):
         if tags_found and self.supports_paralinguistic_tags:
             invalid_tags = [t for t in tags_found if t not in self.PARALINGUISTIC_TAGS]
             if invalid_tags:
-                return False, (f"Unknown tags: {invalid_tags}. " f"Supported: {self.PARALINGUISTIC_TAGS}")
+                return False, (f"Unknown tags: {invalid_tags}. Supported: {self.PARALINGUISTIC_TAGS}")
 
         return True, "OK"

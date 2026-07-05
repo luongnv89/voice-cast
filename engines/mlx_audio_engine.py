@@ -134,7 +134,7 @@ class MlxAudioEngine(TTSEngineBase):
         """
         if not is_apple_silicon():
             raise RuntimeError(
-                "MLX Audio requires Apple Silicon (M1/M2/M3/M4). " "This engine is not available on your platform."
+                "MLX Audio requires Apple Silicon (M1/M2/M3/M4). This engine is not available on your platform."
             )
 
         super().__init__(speaker_wav, device)
