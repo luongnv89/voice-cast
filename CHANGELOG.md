@@ -46,6 +46,11 @@
 
 ### Documentation
 
+- Added `docs/decisions/tts-fork.md`: evidence-backed adopt decision for the
+  maintained `idiap/coqui-ai-TTS` fork (`coqui-tts` on PyPI) of the unmaintained
+  Coqui TTS package, with API-diff verification against the engine, downloader,
+  and factory call sites, a license check (MPL-2.0 code / CPML XTTS v2 weights),
+  and a follow-up migration outline; no code migration in this change (#64)
 - Added `docs/agent-environment.md` with agent-facing setup and run notes (#46)
 - Added `CLAUDE.md` and `AGENTS.md` at the repo root pointing to the environment notes (#47, #48)
 - Documented the proven lockfile bootstrap (fresh venv → install → suite) with
