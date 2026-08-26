@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Fixed
+
+- The model registry's Coqui cache dir is now derived from the Coqui backend's
+  own default (`TTS.utils.generic_utils.get_user_data_dir("tts")`, TTS 0.22.0)
+  instead of hardcoding `~/.local/share` on Linux, so `TTS_HOME` and
+  `XDG_DATA_HOME` overrides are honored and the download→registry→engine
+  lazy-loader path agreement no longer rests on implicit convention; pinned by
+  a download→`is_installed` round-trip regression test (#55)
+
 ### Documentation
 
 - Added `docs/agent-environment.md` with agent-facing setup and run notes (#46)

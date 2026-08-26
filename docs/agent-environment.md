@@ -111,6 +111,8 @@ Only two are read from the environment (see `models/model_registry.py`):
 | Variable | Purpose | Default when unset |
 |----------|---------|--------------------|
 | `HF_HOME` | Root of the HuggingFace hub cache | `~/.cache/huggingface` |
+| `TTS_HOME` | Base for the Coqui TTS cache (outranks `XDG_DATA_HOME`) | unset |
+| `XDG_DATA_HOME` | Linux base for the Coqui TTS cache when `TTS_HOME` is unset | `~/.local/share` |
 | `LOCALAPPDATA` | Windows-only base for the Coqui TTS cache | user home directory |
 
 There is **no `.env` / dotenv mechanism** in this codebase and no `.env.example`
