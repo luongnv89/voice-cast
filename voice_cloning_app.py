@@ -137,6 +137,10 @@ class VoiceCloningApp(QMainWindow):
 
     def closeEvent(self, event):
         """Clean up resources when window closes."""
+        # Terminate any in-flight generation to prevent crash-on-exit
+        if self._clone_flow.is_running:
+            self._clone_flow.terminate()
+
         # Stop any playing audio
         if self._audio.audio_available:
             with contextlib.suppress(Exception):
