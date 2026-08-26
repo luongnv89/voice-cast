@@ -181,8 +181,13 @@ package.json
 package-lock.json
 
 # Generated audio output (keep locally, don't commit)
-output-examples/*.wav
-output-examples/*.mp3
+output-examples/
+
+# Voice samples (keep locally, don't commit)
+voice-samples/
+
+# Audiobook samples (keep locally, don't commit)
+maisie-books/
 
 # AI assistant config (optional, can be kept or ignored)
 .claude/
