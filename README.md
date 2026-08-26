@@ -177,15 +177,6 @@ MIT licensed. Runs locally. Works on Linux, macOS, and Windows.
 </details>
 
 <details>
-<summary>Optional: Install Chatterbox Engine</summary>
-
-```bash
-pip install -e ".[chatterbox]"
-```
-
-</details>
-
-<details>
 <summary>Optional: Install MLX Backend (Apple Silicon)</summary>
 
 ```bash
