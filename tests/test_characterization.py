@@ -19,7 +19,6 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers: fake registry and stub modules
 # ---------------------------------------------------------------------------
@@ -124,15 +123,16 @@ class TestDownloadInstallRoundTrip:
         """Characterization: cache-dir derivation affects download path."""
         _install_stub_hf_hub(monkeypatch, return_path=str(tmp_path / "hf-cache"))
 
-        from models.downloaders.chatterbox_downloader import ChatterboxDownloader
         from models.downloaders import coqui_downloader
+        from models.downloaders.chatterbox_downloader import ChatterboxDownloader
 
         monkeypatch.setattr(
             "models.downloaders.chatterbox_downloader.get_registry",
             lambda: _fake_registry(str(tmp_path)),
         )
         monkeypatch.setattr(
-            coqui_downloader, "get_registry",
+            coqui_downloader,
+            "get_registry",
             lambda: _fake_registry(str(tmp_path)),
         )
 
@@ -182,12 +182,18 @@ class TestVariantSelection:
         from models.model_info import ModelInfo
 
         a = ModelInfo(
-            id="test-model", engine="coqui", name="Test",
-            size_mb=100, description="Test",
+            id="test-model",
+            engine="coqui",
+            name="Test",
+            size_mb=100,
+            description="Test",
         )
         b = ModelInfo(
-            id="test-model", engine="coqui", name="Test",
-            size_mb=100, description="Test",
+            id="test-model",
+            engine="coqui",
+            name="Test",
+            size_mb=100,
+            description="Test",
         )
         assert a == b
 
@@ -196,8 +202,11 @@ class TestVariantSelection:
         from models.model_info import ModelInfo
 
         info = ModelInfo(
-            id="xtts-v2", engine="coqui", name="XTTS v2",
-            size_mb=2400, description="XTTS model",
+            id="xtts-v2",
+            engine="coqui",
+            name="XTTS v2",
+            size_mb=2400,
+            description="XTTS model",
             is_installed=True,
         )
         s = str(info)
@@ -210,8 +219,11 @@ class TestVariantSelection:
 
         with pytest.raises(ValueError, match="Model ID cannot be empty"):
             ModelInfo(
-                id="", engine="coqui", name="Test",
-                size_mb=100, description="Test",
+                id="",
+                engine="coqui",
+                name="Test",
+                size_mb=100,
+                description="Test",
             )
 
 
@@ -253,9 +265,7 @@ class TestEngineGeneratePaths:
 
         output_file = str(tmp_path / "output.wav")
         # Make the mock return audio data that soundfile can write
-        engine_mock.generate.return_value = (
-            np.array([0.1] * 1000, dtype=np.float32), 22050
-        )
+        engine_mock.generate.return_value = (np.array([0.1] * 1000, dtype=np.float32), 22050)
         cloner = VoiceCloner(speaker_wav=str(speaker_file), engine=engine_mock)
         cloner.say("hello", save_audio=True, output_file=output_file, play_audio=False)
 
@@ -382,8 +392,11 @@ class TestModelRegistry:
 
         reg = ModelRegistry()
         info = ModelInfo(
-            id="custom-model", engine="coqui", name="Custom Model",
-            size_mb=50, description="Custom test model",
+            id="custom-model",
+            engine="coqui",
+            name="Custom Model",
+            size_mb=50,
+            description="Custom test model",
         )
         reg.register_model(info)
         models = reg.list_models()

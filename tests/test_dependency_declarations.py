@@ -66,9 +66,9 @@ def test_dependency_floors_track_current_stable():
     }
     for name, floor in expected_floors.items():
         assert name in specs, f"{name} must stay a declared runtime dependency"
-        assert (
-            _floor_major_minor(specs[name]) == floor
-        ), f"{name} floor must be >={floor[0]}.{floor[1]}, found {specs[name]!r}"
+        assert _floor_major_minor(specs[name]) == floor, (
+            f"{name} floor must be >={floor[0]}.{floor[1]}, found {specs[name]!r}"
+        )
 
 
 def test_mlx_optional_extra_floor_tracks_current_stable():
@@ -84,9 +84,9 @@ def test_transformers_declared_with_floor():
 
     with open(os.path.join(ROOT, "voice_cloner.py")) as f:
         source = f.read()
-    assert re.search(
-        r"^\s*(?:from transformers import|import transformers)", source, re.M
-    ), "the declared transformers edge is guarded by this import"
+    assert re.search(r"^\s*(?:from transformers import|import transformers)", source, re.M), (
+        "the declared transformers edge is guarded by this import"
+    )
 
 
 def _dev_ruff_spec():
@@ -105,9 +105,9 @@ def test_ruff_pins_agree_across_ci_pyproject_and_pre_commit():
         ci_workflow = f.read()
     ci_match = re.search(r"'ruff[><=][^']*'", ci_workflow)
     assert ci_match, "ci.yml lint job must pin ruff"
-    assert (
-        _floor_major_minor(ci_match.group(0)[1:-1]) == dev_line
-    ), "ci.yml ruff pin must share the dev extra's major.minor line"
+    assert _floor_major_minor(ci_match.group(0)[1:-1]) == dev_line, (
+        "ci.yml ruff pin must share the dev extra's major.minor line"
+    )
 
     with open(os.path.join(ROOT, ".pre-commit-config.yaml")) as f:
         pre_commit = f.read()
