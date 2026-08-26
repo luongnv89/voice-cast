@@ -291,6 +291,9 @@ class VoiceCloningApp(QMainWindow):
         result_layout.addStretch()
         layout.addLayout(result_layout)
 
+        # Initialize generate button state based on current inputs
+        self._update_generate_state()
+
         layout.addStretch()
 
     # ------------------------------------------------------------------ #
