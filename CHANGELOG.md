@@ -8,7 +8,9 @@
   `voice_cloning_app` entry point and constructs the main window headlessly;
   the CI test job now installs PySide6 and pygame (with `libegl1`/`libgl1`
   system libraries and an explicit `QT_QPA_PLATFORM=offscreen`) so the test
-  exercises the real Qt chain in CI instead of skipping (#51)
+  exercises the real Qt chain in CI instead of skipping, plus `tqdm` for the
+  HF download progress bridge that installing PySide6 un-skips in
+  `tests/test_download_streaming.py` (#51)
 
 ### Fixed
 

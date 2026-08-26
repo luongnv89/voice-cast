@@ -70,9 +70,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest pytest-cov
           # Install core dependencies (skip heavy ML packages for CI)
-          pip install sounddevice soundfile rich numpy
+          pip install sounddevice soundfile rich numpy tqdm
           # GUI stack so the smoke test exercises the real Qt import chain
-          # instead of skipping (F-CI-003)
+          # instead of skipping (F-CI-003); PySide6 also un-skips
+          # test_download_streaming.py, whose HF progress bridge needs tqdm
           pip install PySide6 pygame
           # Install the project package (no deps — core ones are above)
           pip install -e . --no-deps
