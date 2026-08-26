@@ -82,7 +82,7 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
-          pytest tests/ -v --tb=short
+          pytest tests/ -v --tb=short --cov=. --cov-report=term-missing
 
   pre-commit:
     name: Pre-commit Hooks

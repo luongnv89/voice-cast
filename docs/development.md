@@ -140,6 +140,12 @@ pytest tests/test_voice_cloner.py
 pytest tests/test_voice_cloner.py::test_initialization
 ```
 
+### Coverage Baseline
+
+Current project coverage (recorded 2025-01-XX): **34%** total. CI emits a per-run
+report via `--cov-report=term-missing`. Target: increase incrementally with each
+new test addition.
+
 ### Writing Tests
 
 ```python
