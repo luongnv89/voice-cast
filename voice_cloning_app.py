@@ -217,7 +217,6 @@ class VoiceCloningApp(QMainWindow):
         self.text_input.setPlaceholderText("Enter text to generate audio...")
         self.text_input.setMinimumHeight(120)
         self.text_input.textChanged.connect(self._update_generate_state)
-        self.btn_select_voice.clicked.connect(self._update_generate_state)
         text_layout.addWidget(self.text_input)
         text_group.setLayout(text_layout)
         layout.addWidget(text_group)
@@ -230,6 +229,7 @@ class VoiceCloningApp(QMainWindow):
         self.btn_select_voice = StyledButton("Select Voice File", variant="secondary")
         self.btn_select_voice.setAccessibleName("Select voice file")
         self.btn_select_voice.clicked.connect(self.select_voice_file)
+        self.btn_select_voice.clicked.connect(self._update_generate_state)
         voice_layout.addWidget(self.btn_select_voice)
 
         self.voice_label = StyledLabel("No voice file selected", role="muted")

@@ -36,20 +36,22 @@ class TestGenerateGate:
             window.close()
 
     def test_generate_enabled_when_text_entered(self, qapp):
-        """Generate becomes enabled after text is entered (voice not required for preset engines)."""
+        """Generate becomes enabled after text is entered (for preset engines)."""
         from voice_cloning_app import VoiceCloningApp
 
         window = VoiceCloningApp()
         try:
-            # Check if voice is required for default engine
+            # For preset engines that don't require a voice file,
+            # entering text should enable Generate
             voice_required = window.is_voice_required
             if not voice_required:
                 window.text_input.setPlainText("Hello world")
                 assert window.btn_generate.isEnabled() is True
                 assert not window._generate_hint.isVisible()
             else:
-                # For engines requiring voice, need both text and voice
-                pytest.skip("Engine requires voice file — test covers text-only path")
+                # For engines requiring voice, we need both text and voice
+                # Skip this sub-test since it requires a real voice file
+                pytest.skip("Engine requires voice file")
         finally:
             window.close()
 
