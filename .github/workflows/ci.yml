@@ -63,7 +63,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libportaudio2 libsndfile1
+          sudo apt-get install -y libportaudio2 libsndfile1 libegl1 libgl1
 
       - name: Install Python dependencies
         run: |
@@ -71,10 +71,15 @@ jobs:
           pip install pytest pytest-cov
           # Install core dependencies (skip heavy ML packages for CI)
           pip install sounddevice soundfile rich numpy
+          # GUI stack so the smoke test exercises the real Qt import chain
+          # instead of skipping (F-CI-003)
+          pip install PySide6 pygame
           # Install the project package (no deps — core ones are above)
           pip install -e . --no-deps
 
       - name: Run tests
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: |
           pytest tests/ -v --tb=short
 

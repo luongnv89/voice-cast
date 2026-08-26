@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- GUI import/offscreen smoke test (`tests/test_gui_smoke.py`) that imports the
+  `voice_cloning_app` entry point and constructs the main window headlessly;
+  the CI test job now installs PySide6 and pygame (with `libegl1`/`libgl1`
+  system libraries and an explicit `QT_QPA_PLATFORM=offscreen`) so the test
+  exercises the real Qt chain in CI instead of skipping (#51)
+
 ### Fixed
 
 - Chatterbox variant selection is now honored end-to-end: the engine loads
