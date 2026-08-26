@@ -4,6 +4,33 @@
 
 ### Added
 
+- `transformers` declared as an explicit runtime dependency
+  (`transformers>=4.46.3`) in `pyproject.toml` — `voice_cloner.py` imports it
+  directly, so the GUI import chain no longer relies on a transitive Coqui
+  edge; lockfile regenerated (#54)
+- Dependency floors refreshed toward current stable for soundfile (`0.14.0`),
+  PySide6 (`6.11.0`), rich (`15.0.0`), mlx (`0.32.0`), and numpy (`1.26.0`);
+  ruff CI pin and dev-extra cap moved to `>=0.16.0,<0.17.0`, aligned with the
+  pre-commit rev `v0.16.4`; lockfile regenerated (#53)
+
+### Changed
+
+- The CI security job can now fail: bandit runs blocking (no `|| true`) and
+  `safety check` is replaced by a pip-audit scan of the fully pinned lockfile
+  via `scripts/pip_audit_lockfile.sh` (`--no-deps --disable-pip`; no package
+  installs). The 43 advisories known at establishment time (2026-08-26:
+  torch/onnx/starlette/diffusers/gradio/transformers) are explicit documented
+  `--ignore-vuln` entries in that wrapper — any advisory outside the baseline
+  fails the job (#52)
+
+### Fixed
+
+- The pre-commit dependency-vulnerability hook now executes when invoked: the
+  skipped/unmaintained safety hook was replaced by a local `pip-audit-lockfile`
+  hook targeting `requirements.txt` through the same shared wrapper (network
+  access to advisory DBs required), and the CI pre-commit job no longer sets
+  `SKIP` for it (#52)
+
 - GUI import/offscreen smoke test (`tests/test_gui_smoke.py`) that imports the
   `voice_cloning_app` entry point and constructs the main window headlessly;
   the CI test job now installs PySide6 and pygame (with `libegl1`/`libgl1`

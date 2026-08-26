@@ -30,7 +30,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install 'ruff>=0.8.0,<0.9.0' bandit
+          pip install 'ruff>=0.16.0,<0.17.0' bandit
 
       - name: Run Ruff linter
         run: ruff check .
@@ -99,12 +99,6 @@ jobs:
 
       - name: Run pre-commit
         uses: pre-commit/action@v3.0.1
-        env:
-          # The safety hook needs a pinned lockfile and network DB access;
-          # .pre-commit-config.yaml already skips it for CI (ci.skip is only
-          # honored by pre-commit.ci). Dependency scanning stays in the
-          # non-blocking Security Scan job (`safety check ... || true`).
-          SKIP: python-safety-dependencies-check
 
   security:
     name: Security Scan
@@ -123,13 +117,16 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install bandit safety
+          pip install bandit pip-audit
 
       - name: Run Bandit
-        run: bandit -c pyproject.toml -r . --exclude tests -f json -o bandit-report.json || true
+        run: bandit -c pyproject.toml -r . --exclude tests -f json -o bandit-report.json
 
-      - name: Check dependencies for vulnerabilities
-        run: safety check -r requirements.txt --full-report || true
+      # Advisory scan against the fully pinned lockfile via the shared
+      # wrapper (single source of the documented advisory baseline); any
+      # advisory not in that baseline fails the job.
+      - name: Audit dependencies with pip-audit
+        run: ./scripts/pip_audit_lockfile.sh
 
       - name: Upload security report
         uses: actions/upload-artifact@v4

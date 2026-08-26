@@ -72,7 +72,7 @@ Gotchas discovered during that verification:
   works; `--all-extras` cannot produce a universal solution because the
   darwin-only `mlx` extra conflicts with `chatterbox-tts`' per-Python
   `transformers` pins on the Python ≥ 3.13 split. The dev extra caps
-  `ruff < 0.9` on purpose — that is the range the CI lint job uses, so the
+  `ruff < 0.17` on purpose — that is the range the CI lint job uses, so the
   locked formatter never disagrees with CI.
 - **Headless Qt needs the offscreen platform.** PySide6 ships in the lock, so
   the engine-control widget tests actually execute locally (20 tests that CI
@@ -135,6 +135,7 @@ ruff format --check .
 
 # Security scan (CI security job)
 bandit -c pyproject.toml -r . --exclude tests
+scripts/pip_audit_lockfile.sh
 
 # Pre-commit hooks (CI pre-commit job)
 pre-commit install        # once per clone
@@ -153,8 +154,11 @@ and security jobs.
   ones that exercise them (see the bootstrap section above).
 - `requirements.txt` remains the fully pinned universal lock of
   `pyproject.toml` (+ the `dev` extra), consumed by the CI *security* job and
-  the pre-commit safety hook. Regenerate it whenever dependencies change
-  (`tests/test_requirements_lock.py` enforces sync).
+  the pre-commit pip-audit hook. Regenerate it whenever dependencies change
+  (`tests/test_requirements_lock.py` enforces sync). The pip-audit baseline
+  lives in `scripts/pip_audit_lockfile.sh`: every advisory known at baseline
+  time is an explicit `--ignore-vuln`, and any advisory outside that list fails
+  CI — remove entries by upgrading the affected package, not by re-baselining.
 
 ## See also
 

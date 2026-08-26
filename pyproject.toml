@@ -11,23 +11,25 @@ dependencies = [
     "TTS>=0.22.0",
     "chatterbox-tts>=0.1.0",
     "sounddevice>=0.5.1",
-    "soundfile>=0.13.0",
-    "PySide6>=6.4.0",
-    "rich>=13.0.0",
+    "soundfile>=0.14.0",
+    "PySide6>=6.11.0",
+    "rich>=15.0.0",
     "pygame>=2.5.0",
-    "numpy>=1.24.0",
+    "numpy>=1.26.0",
+    "transformers>=4.46.3",
 ]
 
 [project.optional-dependencies]
 mlx = [
-    "mlx>=0.21.0; platform_machine == 'arm64' and sys_platform == 'darwin'",
+    "mlx>=0.32.0; platform_machine == 'arm64' and sys_platform == 'darwin'",
     "mlx-audio>=0.1.0; platform_machine == 'arm64' and sys_platform == 'darwin'",
 ]
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.0.0",
-    "ruff>=0.8.0,<0.9.0",
+    "ruff>=0.16.0,<0.17.0",
     "bandit>=1.8.0",
+    "pip-audit>=2.9.0",
     "pre-commit>=4.0.0",
 ]
 

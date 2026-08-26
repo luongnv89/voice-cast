@@ -98,12 +98,7 @@ ruff format .
 
 ```python
 # Type hints for function signatures
-def generate(
-    self,
-    text: str,
-    language: str = "en",
-    **kwargs
-) -> tuple[np.ndarray, int]:
+def generate(self, text: str, language: str = "en", **kwargs) -> tuple[np.ndarray, int]:
     """
     Generate audio from text.
 
@@ -116,6 +111,7 @@ def generate(
         Tuple of (audio_data, sample_rate)
     """
     pass
+
 
 # Use descriptive variable names
 speaker_reference_path = "./voice-samples/speaker.wav"
@@ -151,6 +147,7 @@ pytest tests/test_voice_cloner.py::test_initialization
 import pytest
 from voice_cloner import VoiceCloner
 
+
 class TestMyFeature:
     def test_basic_functionality(self, tmp_path):
         """Test basic feature behavior."""
@@ -177,9 +174,11 @@ Common fixtures are in `tests/conftest.py`:
 ```python
 import pytest
 
+
 @pytest.fixture
 def sample_voice_path():
     return "./voice-samples/test.wav"
+
 
 @pytest.fixture
 def cloner(sample_voice_path):
@@ -195,17 +194,13 @@ def cloner(sample_voice_path):
 import numpy as np
 from tts_engine_base import TTSEngineBase
 
+
 class MyEngine(TTSEngineBase):
     """TTS engine using My TTS Library."""
 
     SUPPORTED_LANGUAGES = ["en", "es"]
 
-    def __init__(
-        self,
-        speaker_wav: str,
-        device: str | None = None,
-        my_param: float = 0.5
-    ):
+    def __init__(self, speaker_wav: str, device: str | None = None, my_param: float = 0.5):
         super().__init__(speaker_wav, device)
         self.my_param = my_param
         self._model = None  # Lazy loading
@@ -215,35 +210,20 @@ class MyEngine(TTSEngineBase):
         """Lazy load model on first use."""
         if self._model is None:
             from my_tts_library import Model
+
             self._model = Model.load(device=self.device)
         return self._model
 
-    def generate(
-        self,
-        text: str,
-        language: str = "en",
-        my_param: float = None,
-        **kwargs
-    ) -> tuple[np.ndarray, int]:
+    def generate(self, text: str, language: str = "en", my_param: float = None, **kwargs) -> tuple[np.ndarray, int]:
         param = my_param or self.my_param
 
-        audio = self.model.synthesize(
-            text=text,
-            reference=self.speaker_wav,
-            param=param
-        )
+        audio = self.model.synthesize(text=text, reference=self.speaker_wav, param=param)
 
         return audio.numpy().astype(np.float32), 22050
 
     def get_supported_parameters(self) -> dict:
         return {
-            "my_param": {
-                "type": float,
-                "default": 0.5,
-                "description": "My custom parameter",
-                "min": 0.0,
-                "max": 1.0
-            }
+            "my_param": {"type": float, "default": 0.5, "description": "My custom parameter", "min": 0.0, "max": 1.0}
         }
 
     @property
@@ -266,11 +246,8 @@ def _register_default_engines():
     # Register My Engine
     try:
         from engines.my_engine import MyEngine
-        TTSFactory.register(
-            name="my-engine",
-            engine_class=MyEngine,
-            display_name="My TTS Engine"
-        )
+
+        TTSFactory.register(name="my-engine", engine_class=MyEngine, display_name="My TTS Engine")
     except ImportError as e:
         logger.warning(f"My engine not available: {e}")
 ```
@@ -302,6 +279,7 @@ def _create_my_engine_controls(self):
 # tests/test_my_engine.py
 import pytest
 from engines.my_engine import MyEngine
+
 
 class TestMyEngine:
     @pytest.fixture

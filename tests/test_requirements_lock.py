@@ -1,8 +1,8 @@
 """Tests guarding the pinned requirements.txt lockfile.
 
-The lockfile is consumed by the CI security job (`safety check -r
-requirements.txt`) and the pre-commit safety hook (`files:
-requirements\\.txt$`). These tests keep it present, fully pinned, and in
+The lockfile is consumed by the CI security job (`pip-audit --requirement
+requirements.txt`) and the pre-commit pip-audit hook (`files:
+^requirements\\.txt$`). These tests keep it present, fully pinned, and in
 sync with the runtime dependencies declared in pyproject.toml.
 """
 
@@ -60,16 +60,42 @@ def test_every_entry_is_exactly_pinned():
 
 def test_all_runtime_deps_are_pinned():
     runtime_deps = _runtime_dep_names()
-    assert len(runtime_deps) >= 10, "expected the 10 declared runtime dependencies"
+    assert len(runtime_deps) >= 11, "expected the 11 declared runtime dependencies"
     pins = _pinned_names()
     missing = [name for name in runtime_deps if name not in pins]
     assert not missing, f"Runtime dependencies missing from requirements.txt: {missing}"
 
 
 def test_lockfile_consumers_reference_it_validly():
+    audit_script = os.path.join(ROOT, "scripts", "pip_audit_lockfile.sh")
     ci_workflow = _read(os.path.join(".github", "workflows", "ci.yml"))
-    assert "safety check -r requirements.txt" in ci_workflow
+    assert "scripts/pip_audit_lockfile.sh" in ci_workflow
+    assert "|| true" not in ci_workflow, "CI steps must be allowed to fail the job"
+    assert "safety check" not in ci_workflow, "safety was replaced by pip-audit"
     pre_commit = _read(".pre-commit-config.yaml")
     assert re.search(
-        r"^\s+files:\s*requirements\\\.txt\$\s*$", pre_commit, re.MULTILINE
-    ), "pre-commit safety hook must target requirements.txt"
+        r"^\s+entry:\s*scripts/pip_audit_lockfile\.sh\s*$", pre_commit, re.MULTILINE
+    ), "pre-commit must scan the lockfile via the shared pip-audit wrapper"
+    assert re.search(
+        r"^\s+files:\s*\^requirements\\\.txt\$\s*$", pre_commit, re.MULTILINE
+    ), "pre-commit pip-audit hook must target requirements.txt"
+    assert (
+        "python-safety-dependencies-check" not in pre_commit
+    ), "the replaced safety hook must not linger in config or skip lists"
+    assert os.path.isfile(audit_script), "the shared pip-audit wrapper must exist"
+
+
+def test_pip_audit_baseline_is_explicit_and_wellformed():
+    """Every ignored advisory must be an explicit, documented ID (#52)."""
+    script_path = os.path.join(ROOT, "scripts", "pip_audit_lockfile.sh")
+    with open(script_path) as f:
+        content = f.read()
+    ids = re.findall(r"^\s+([A-Za-z]+-[A-Za-z0-9.\-]+)\s*$", content, re.MULTILINE)
+    assert len(ids) >= 40, f"expected the documented 43-entry advisory baseline, found {len(ids)}"
+    assert len(ids) == len(set(ids)), "baseline IDs must not repeat"
+    bad = [i for i in ids if not re.match(r"^(PYSEC|CVE|GHSA)-[A-Za-z0-9.\-]+$", i)]
+    assert not bad, f"malformed advisory IDs in baseline: {bad}"
+    assert "--ignore-vuln" in content, "IDs must be passed as --ignore-vuln args"
+    assert (
+        "--disable-pip" in content and "--no-deps" in content
+    ), "the fully pinned lockfile must be audited without pip installs"

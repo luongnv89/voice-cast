@@ -27,6 +27,7 @@ UserWarning: CUDA not available, using CPU
 3. **Verify CUDA in Python:**
    ```python
    import torch
+
    print(torch.cuda.is_available())  # Should be True
    print(torch.cuda.get_device_name(0))  # Shows GPU name
    ```
@@ -133,6 +134,7 @@ CUDA out of memory. Tried to allocate X MiB
 2. **Clear GPU memory:**
    ```python
    import torch
+
    torch.cuda.empty_cache()
    ```
 
@@ -196,13 +198,15 @@ CUDA out of memory. Tried to allocate X MiB
 3. **Check audio device:**
    ```python
    import sounddevice as sd
+
    print(sd.query_devices())
    ```
 
 4. **Set specific device:**
    ```python
    import sounddevice as sd
-   sd.default.device = 'Your Device Name'
+
+   sd.default.device = "Your Device Name"
    ```
 
 ### Audio Quality Issues
@@ -248,6 +252,7 @@ FileNotFoundError: Speaker reference file not found: ./speaker.wav
 2. **Use absolute path:**
    ```python
    import os
+
    speaker_path = os.path.abspath("./voice-samples/speaker.wav")
    cloner = VoiceCloner(speaker_wav=speaker_path)
    ```
@@ -274,8 +279,9 @@ RuntimeError: Error loading audio file
 2. **Check audio file:**
    ```python
    import soundfile as sf
+
    data, sr = sf.read("speaker.wav")
-   print(f"Duration: {len(data)/sr:.2f}s, Sample rate: {sr}")
+   print(f"Duration: {len(data) / sr:.2f}s, Sample rate: {sr}")
    ```
 
 3. **Ensure mono or stereo (not multichannel)**
@@ -291,6 +297,7 @@ FileNotFoundError: [Errno 2] No such file or directory: './outputs/audio.wav'
 Directories are created automatically, but verify parent exists:
 ```python
 import os
+
 os.makedirs("./outputs", exist_ok=True)
 cloner.say(text, save_audio=True, output_file="./outputs/audio.wav")
 ```
@@ -457,6 +464,7 @@ NO_COLOR=1 python vcloner.py ...
 1. **Clear Python garbage:**
    ```python
    import gc
+
    gc.collect()
    ```
 
@@ -484,6 +492,7 @@ If your issue isn't covered here:
    ```python
    import torch
    import platform
+
    print(f"Python: {platform.python_version()}")
    print(f"PyTorch: {torch.__version__}")
    print(f"CUDA: {torch.cuda.is_available()}")
