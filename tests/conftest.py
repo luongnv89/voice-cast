@@ -44,7 +44,7 @@ class _OptionalDependencyFinder(MetaPathFinder):
         try:
             installed = importlib.util.find_spec(fullname)
         except ImportError:
-            # A partial/None sys.modules entry means the real module is
+            # A partially-initialized module entry means the real module is
             # already mid-import; let the normal machinery resolve it.
             return None
         finally:
