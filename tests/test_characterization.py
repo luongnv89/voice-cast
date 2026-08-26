@@ -424,54 +424,65 @@ pytest.importorskip("PySide6")
 class TestVoiceClonerCache:
     """Tests for the VoiceClonerCache class."""
 
-    def test_cache_miss_creates_new_cloner(self):
+    @pytest.fixture
+    def speaker_file(self, tmp_path):
+        """Create a temporary speaker file for tests."""
+        return str(tmp_path / "speaker.wav")
+
+    def test_cache_miss_creates_new_cloner(self, speaker_file):
         """First access must create a new VoiceCloner."""
         from gui.clone_flow_controller import VoiceClonerCache
 
         cache = VoiceClonerCache()
-        cloner = cache.get("coqui", "/path/to/speaker.wav")
+        cloner = cache.get("coqui", speaker_file)
 
         assert cloner is not None
         assert cache.size == 1
 
-    def test_cache_hit_returns_same_cloner(self):
+    def test_cache_hit_returns_same_cloner(self, speaker_file):
         """Repeated access with same keys must return the same instance."""
         from gui.clone_flow_controller import VoiceClonerCache
 
         cache = VoiceClonerCache()
-        cloner1 = cache.get("coqui", "/path/to/speaker.wav")
-        cloner2 = cache.get("coqui", "/path/to/speaker.wav")
+        cloner1 = cache.get("coqui", speaker_file)
+        cloner2 = cache.get("coqui", speaker_file)
 
         assert cloner1 is cloner2
         assert cache.size == 1
 
-    def test_different_engines_different_caches(self):
+    def test_different_engines_different_caches(self, tmp_path):
         """Different engine names must have separate cache entries."""
         from gui.clone_flow_controller import VoiceClonerCache
 
         cache = VoiceClonerCache()
-        cache.get("coqui", "/path/to/speaker.wav")
-        cache.get("chatterbox-turbo", "/path/to/speaker.wav")
+        speaker_a = str(tmp_path / "speaker_a.wav")
+        speaker_b = str(tmp_path / "speaker_b.wav")
+        cache.get("coqui", speaker_a)
+        cache.get("chatterbox-turbo", speaker_b)
 
         assert cache.size == 2
 
-    def test_different_speakers_different_caches(self):
+    def test_different_speakers_different_caches(self, tmp_path):
         """Different speaker paths must have separate cache entries."""
         from gui.clone_flow_controller import VoiceClonerCache
 
         cache = VoiceClonerCache()
-        cache.get("coqui", "/path/to/speaker_a.wav")
-        cache.get("coqui", "/path/to/speaker_b.wav")
+        speaker_a = str(tmp_path / "speaker_a.wav")
+        speaker_b = str(tmp_path / "speaker_b.wav")
+        cache.get("coqui", speaker_a)
+        cache.get("coqui", speaker_b)
 
         assert cache.size == 2
 
-    def test_invalidate_engine_clears_only_that_engine(self):
+    def test_invalidate_engine_clears_only_that_engine(self, tmp_path):
         """Invalidating an engine must only remove entries for that engine."""
         from gui.clone_flow_controller import VoiceClonerCache
 
         cache = VoiceClonerCache()
-        cache.get("coqui", "/path/to/speaker.wav")
-        cache.get("chatterbox-turbo", "/path/to/speaker.wav")
+        speaker_a = str(tmp_path / "speaker_a.wav")
+        speaker_b = str(tmp_path / "speaker_b.wav")
+        cache.get("coqui", speaker_a)
+        cache.get("chatterbox-turbo", speaker_b)
 
         assert cache.size == 2
 
@@ -479,28 +490,32 @@ class TestVoiceClonerCache:
 
         assert cache.size == 1
 
-    def test_invalidate_speaker_clears_only_that_speaker(self):
+    def test_invalidate_speaker_clears_only_that_speaker(self, tmp_path):
         """Invalidating a speaker must only remove entries for that speaker."""
         from gui.clone_flow_controller import VoiceClonerCache
 
         cache = VoiceClonerCache()
-        cache.get("coqui", "/path/to/speaker_a.wav")
-        cache.get("chatterbox-turbo", "/path/to/speaker_a.wav")
-        cache.get("coqui", "/path/to/speaker_b.wav")
+        speaker_a = str(tmp_path / "speaker_a.wav")
+        speaker_b = str(tmp_path / "speaker_b.wav")
+        cache.get("coqui", speaker_a)
+        cache.get("chatterbox-turbo", speaker_a)
+        cache.get("coqui", speaker_b)
 
         assert cache.size == 3
 
-        cache.invalidate(speaker_wav="/path/to/speaker_a.wav")
+        cache.invalidate(speaker_wav=speaker_a)
 
         assert cache.size == 1
 
-    def test_invalidate_all_clears_everything(self):
+    def test_invalidate_all_clears_everything(self, tmp_path):
         """Invalidating with no args must clear the entire cache."""
         from gui.clone_flow_controller import VoiceClonerCache
 
         cache = VoiceClonerCache()
-        cache.get("coqui", "/path/to/speaker.wav")
-        cache.get("chatterbox-turbo", "/path/to/speaker.wav")
+        speaker_a = str(tmp_path / "speaker_a.wav")
+        speaker_b = str(tmp_path / "speaker_b.wav")
+        cache.get("coqui", speaker_a)
+        cache.get("chatterbox-turbo", speaker_b)
 
         assert cache.size == 2
 
