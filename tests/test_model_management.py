@@ -1,6 +1,9 @@
 """Tests for model management functionality."""
 
 import ast
+import os
+import sys
+import types
 from pathlib import Path
 from unittest.mock import patch
 
@@ -305,6 +308,119 @@ class TestModelDownloader:
 
         downloader = ModelDownloader()
         assert isinstance(downloader._get_downloader("mlx-audio"), MlxDownloader)
+
+
+def _expected_backend_data_root() -> Path:
+    """Mirror TTS 0.22.0 ``get_user_data_dir`` data-root resolution.
+
+    Upstream contract (TTS/utils/generic_utils.py in the pinned 0.22.0
+    release): ``TTS_HOME`` wins, then ``XDG_DATA_HOME``, then the platform
+    default (Local AppData on Windows, ``~/Library/Application Support`` on
+    macOS, ``~/.local/share`` elsewhere).
+    """
+    tts_home = os.environ.get("TTS_HOME")
+    xdg_data_home = os.environ.get("XDG_DATA_HOME")
+    if tts_home:
+        return Path(tts_home).expanduser().resolve(strict=False)
+    if xdg_data_home:
+        return Path(xdg_data_home).expanduser().resolve(strict=False)
+    if sys.platform == "win32":
+        return Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support"
+    return Path.home() / ".local" / "share"
+
+
+class _FakeCoquiModelManager:
+    """Reproduce the layout TTS 0.22.0's ModelManager writes.
+
+    With an explicit ``output_prefix`` upstream joins it with ``"tts"``
+    (TTS/utils/manage.py:53) and stores each model under its dash-form name,
+    producing ``<prefix>/tts/tts_models--<lang>--<dataset>--<model>``.
+    """
+
+    def __init__(self, output_prefix=None):
+        if output_prefix is None:
+            self.output_prefix = _expected_backend_data_root() / "tts"
+        else:
+            self.output_prefix = Path(output_prefix) / "tts"
+
+    def download_model(self, model_name):
+        model_dir = self.output_prefix / model_name.replace("/", "--")
+        model_dir.mkdir(parents=True, exist_ok=True)
+        (model_dir / "model_file.pth").touch()
+        config_path = model_dir / "config.json"
+        config_path.touch()
+        return model_dir / "model_file.pth", config_path, {"model_name": model_name}
+
+
+def _install_fake_coqui_tts(monkeypatch, manager_cls=_FakeCoquiModelManager):
+    """Serve a fake TTS.utils.manage package so download() runs without TTS."""
+    manage_mod = types.ModuleType("TTS.utils.manage")
+    manage_mod.ModelManager = manager_cls
+    utils_mod = types.ModuleType("TTS.utils")
+    utils_mod.manage = manage_mod
+    tts_mod = types.ModuleType("TTS")
+    tts_mod.utils = utils_mod
+    monkeypatch.setitem(sys.modules, "TTS", tts_mod)
+    monkeypatch.setitem(sys.modules, "TTS.utils", utils_mod)
+    monkeypatch.setitem(sys.modules, "TTS.utils.manage", manage_mod)
+
+
+class TestCoquiCachePathAgreement:
+    """Pin the Coqui download→registry path agreement to backend defaults.
+
+    The registry must resolve the same directory the Coqui backend resolves
+    on its own (``get_user_data_dir("tts")``, the prefix ``TTS(model_name=...)``
+    uses when the engine lazy-loads), not an assumed default.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _clean_backend_env(self, monkeypatch):
+        monkeypatch.delenv("TTS_HOME", raising=False)
+        monkeypatch.delenv("XDG_DATA_HOME", raising=False)
+
+    def test_explicit_download_round_trip_to_is_installed(self, tmp_path, monkeypatch):
+        """An explicit download must make registry.is_installed(...) true."""
+        from models.downloaders import coqui_downloader
+
+        monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg-data"))
+        registry = ModelRegistry()
+        monkeypatch.setattr(coqui_downloader, "get_registry", lambda: registry)
+        _install_fake_coqui_tts(monkeypatch)
+
+        returned = coqui_downloader.CoquiDownloader().download("coqui-xtts-v2")
+
+        expected_model_dir = (
+            registry.get_cache_dir("coqui") / "tts" / "tts_models--multilingual--multi-dataset--xtts_v2"
+        )
+        assert returned == expected_model_dir
+        assert registry.is_installed("coqui-xtts-v2") is True
+        assert registry.get_install_path("coqui-xtts-v2") == expected_model_dir
+
+    def test_coqui_cache_dir_matches_backend_default_under_xdg(self, tmp_path, monkeypatch):
+        """With XDG_DATA_HOME set, registry and engine lazy-loader agree."""
+        monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg-data"))
+        registry = ModelRegistry()
+
+        assert registry.get_cache_dir("coqui") == _expected_backend_data_root() / "tts"
+
+    def test_tts_home_takes_precedence_over_xdg(self, tmp_path, monkeypatch):
+        """TTS_HOME outranks XDG_DATA_HOME, matching the backend."""
+        monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg-data"))
+        monkeypatch.setenv("TTS_HOME", str(tmp_path / "tts-home"))
+        registry = ModelRegistry()
+
+        assert registry.get_cache_dir("coqui") == _expected_backend_data_root() / "tts"
+
+    def test_default_linux_location_unchanged_without_env_vars(self):
+        """Baseline-green guard: no env vars keeps ~/.local/share/tts."""
+        if sys.platform in ("win32", "darwin"):
+            pytest.skip("Linux-specific default-location assertion")
+
+        registry = ModelRegistry()
+
+        assert registry.get_cache_dir("coqui") == Path.home() / ".local" / "share" / "tts"
 
 
 def _function_def(source_path: str, class_name: str, function_name: str) -> ast.FunctionDef:

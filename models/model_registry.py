@@ -11,6 +11,29 @@ from models.model_info import ModelInfo
 logger = logging.getLogger("voice_cloner.models")
 
 
+def _coqui_default_cache_dir(home: Path) -> Path:
+    """Mirror the Coqui backend's own default cache dir.
+
+    Reproduces ``TTS.utils.generic_utils.get_user_data_dir("tts")`` from the
+    pinned TTS 0.22.0 release so the registry checks the same location the
+    engine lazy-loader resolves, including its ``TTS_HOME`` and
+    ``XDG_DATA_HOME`` overrides.
+    """
+    tts_home = os.environ.get("TTS_HOME")
+    xdg_data_home = os.environ.get("XDG_DATA_HOME")
+    if tts_home:
+        base = Path(tts_home).expanduser().resolve(strict=False)
+    elif xdg_data_home:
+        base = Path(xdg_data_home).expanduser().resolve(strict=False)
+    elif os.name == "nt":  # Windows: upstream reads the Local AppData shell folder
+        base = Path(os.environ.get("LOCALAPPDATA", home))
+    elif platform.system() == "Darwin":
+        base = home / "Library" / "Application Support"
+    else:  # Linux and others
+        base = home / ".local" / "share"
+    return base / "tts"
+
+
 class ModelRegistry:
     """Registry for managing TTS model metadata and installation status.
 
@@ -97,13 +120,9 @@ class ModelRegistry:
         # with backend loader defaults prevents generation-time cache misses.
         home = Path.home()
 
-        # Coqui uses ~/.local/share/tts on Linux, ~/Library/... on macOS
-        if os.name == "nt":  # Windows
-            coqui_cache = Path(os.environ.get("LOCALAPPDATA", home)) / "tts"
-        elif platform.system() == "Darwin":  # macOS
-            coqui_cache = home / "Library" / "Application Support" / "tts"
-        else:  # Linux and others
-            coqui_cache = home / ".local" / "share" / "tts"
+        # Coqui resolves its data dir via get_user_data_dir("tts"), honoring
+        # TTS_HOME and XDG_DATA_HOME — derive ours from the same contract.
+        coqui_cache = _coqui_default_cache_dir(home)
 
         # Chatterbox uses HuggingFace hub cache
         hf_cache = Path(os.environ.get("HF_HOME", home / ".cache" / "huggingface")) / "hub"

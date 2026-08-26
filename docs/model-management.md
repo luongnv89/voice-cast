@@ -80,7 +80,9 @@ VoiceCast detects models in the backend-native caches used by each provider. The
 registry, explicit downloaders, and generation backends all use these same default
 locations so a downloaded model is the model generation sees:
 
-- Coqui: platform-specific TTS cache (`~/.local/share/tts` on Linux,
+- Coqui: the TTS backend's own data dir (`get_user_data_dir("tts")` in
+  `TTS.utils.generic_utils`): `$TTS_HOME/tts` or `$XDG_DATA_HOME/tts` when set,
+  else platform-specific (`~/.local/share/tts` on Linux,
   `~/Library/Application Support/tts` on macOS)
 - Chatterbox and MLX: Hugging Face hub cache (`$HF_HOME/hub` or
   `~/.cache/huggingface/hub`)
