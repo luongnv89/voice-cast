@@ -425,13 +425,28 @@ class TestVoiceClonerCache:
     """Tests for the VoiceClonerCache class."""
 
     @pytest.fixture
+    def mock_engine(self, monkeypatch):
+        """Mock TTSFactory to avoid requiring real engine installation."""
+        from unittest.mock import MagicMock
+
+        mock = MagicMock()
+        mock.generate.return_value = (np.array([0.1], dtype=np.float32), 22050)
+        mock.name = "mock_engine"
+        mock.requires_reference_audio = True
+        monkeypatch.setattr(
+            "tts_factory.TTSFactory.create",
+            lambda **kwargs: mock,
+        )
+        return mock
+
+    @pytest.fixture
     def speaker_file(self, tmp_path):
         """Create a temporary speaker file for tests."""
         f = tmp_path / "speaker.wav"
         f.write_bytes(b"fake audio data")
         return str(f)
 
-    def test_cache_miss_creates_new_cloner(self, speaker_file):
+    def test_cache_miss_creates_new_cloner(self, speaker_file, mock_engine):
         """First access must create a new VoiceCloner."""
         from gui.clone_flow_controller import VoiceClonerCache
 
@@ -441,7 +456,7 @@ class TestVoiceClonerCache:
         assert cloner is not None
         assert cache.size == 1
 
-    def test_cache_hit_returns_same_cloner(self, speaker_file):
+    def test_cache_hit_returns_same_cloner(self, speaker_file, mock_engine):
         """Repeated access with same keys must return the same instance."""
         from gui.clone_flow_controller import VoiceClonerCache
 
@@ -452,7 +467,7 @@ class TestVoiceClonerCache:
         assert cloner1 is cloner2
         assert cache.size == 1
 
-    def test_different_engines_different_caches(self, tmp_path):
+    def test_different_engines_different_caches(self, tmp_path, mock_engine):
         """Different engine names must have separate cache entries."""
         from gui.clone_flow_controller import VoiceClonerCache
 
@@ -466,7 +481,7 @@ class TestVoiceClonerCache:
 
         assert cache.size == 2
 
-    def test_different_speakers_different_caches(self, tmp_path):
+    def test_different_speakers_different_caches(self, tmp_path, mock_engine):
         """Different speaker paths must have separate cache entries."""
         from gui.clone_flow_controller import VoiceClonerCache
 
@@ -480,7 +495,7 @@ class TestVoiceClonerCache:
 
         assert cache.size == 2
 
-    def test_invalidate_engine_clears_only_that_engine(self, tmp_path):
+    def test_invalidate_engine_clears_only_that_engine(self, tmp_path, mock_engine):
         """Invalidating an engine must only remove entries for that engine."""
         from gui.clone_flow_controller import VoiceClonerCache
 
@@ -498,7 +513,7 @@ class TestVoiceClonerCache:
 
         assert cache.size == 1
 
-    def test_invalidate_speaker_clears_only_that_speaker(self, tmp_path):
+    def test_invalidate_speaker_clears_only_that_speaker(self, tmp_path, mock_engine):
         """Invalidating a speaker must only remove entries for that speaker."""
         from gui.clone_flow_controller import VoiceClonerCache
 
@@ -517,7 +532,7 @@ class TestVoiceClonerCache:
 
         assert cache.size == 1
 
-    def test_invalidate_all_clears_everything(self, tmp_path):
+    def test_invalidate_all_clears_everything(self, tmp_path, mock_engine):
         """Invalidating with no args must clear the entire cache."""
         from gui.clone_flow_controller import VoiceClonerCache
 
