@@ -1,16 +1,8 @@
 """Tests for engine-specific control widgets."""
 
-import sys
-from unittest.mock import MagicMock
-
 import pytest
 
 pytest.importorskip("PySide6")
-
-# Mock torch before any imports trigger tts_engine_base → torch chain
-for _mod in ("torch",):
-    if _mod not in sys.modules:
-        sys.modules[_mod] = MagicMock()
 
 from PySide6.QtCore import QCoreApplication  # noqa: E402
 

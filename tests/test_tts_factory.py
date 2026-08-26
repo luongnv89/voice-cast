@@ -1,22 +1,8 @@
-import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
-# Mock heavyweight external modules (not platform_utils — we patch that via tts_factory)
-for _mod in (
-    "TTS",
-    "chatterbox",
-    "mlx_audio",
-    "tts_engine_base",
-):
-    sys.modules[_mod] = MagicMock()
-
-# If another test file (e.g. test_voice_cloner.py) has put a mock in
-# sys.modules["tts_factory"], remove it so the real module is imported.
-sys.modules.pop("tts_factory", None)
-
-from tts_factory import EngineDescriptor, TTSFactory, bootstrap_engines  # noqa: E402
+from tts_factory import EngineDescriptor, TTSFactory, bootstrap_engines
 
 
 class StubEngine:
@@ -85,8 +71,7 @@ class TestEngineDescriptor:
 
     def test_dependencies_installed_coqui(self):
         d = EngineDescriptor(name="coqui", engine_class=StubEngine, display_name="Coqui")
-        with patch.dict(sys.modules, {"TTS": MagicMock()}):
-            assert d.dependencies_installed() is True
+        assert d.dependencies_installed() is True
 
     def test_dependencies_installed_coqui_missing(self):
         d = EngineDescriptor(name="coqui", engine_class=StubEngine, display_name="Coqui")

@@ -1,31 +1,14 @@
 """Tests for VoiceCloner."""
 
 import os
-import sys
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 
-# ---------------------------------------------------------------------------
-# Mock heavyweight module-level dependencies so tests run with zero
-# external dependencies -- no sounddevice, soundfile, transformers, etc.
-# ---------------------------------------------------------------------------
-for _mod in (
-    "sounddevice",
-    "soundfile",
-    "rich",
-    "rich.console",
-    "rich.logging",
-    "transformers",
-    "tts_engine_base",
-    "tts_factory",
-):
-    sys.modules[_mod] = MagicMock()
-
-from models.model_info import ModelInfo  # noqa: E402
-from models.model_registry import ModelRegistry  # noqa: E402
-from voice_cloner import VoiceCloner  # noqa: E402
+from models.model_info import ModelInfo
+from models.model_registry import ModelRegistry
+from voice_cloner import VoiceCloner
 
 
 @pytest.fixture
