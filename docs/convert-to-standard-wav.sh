@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Convert to Standard WAV
+# See docs/convert-to-standard-wav.md for full documentation.
+
 # Check if the input file is provided
 if [ -z "$1" ]; then
   echo "Usage: $0 <input_wav_file>"
