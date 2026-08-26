@@ -276,6 +276,12 @@ class VoiceCloningApp(QMainWindow):
         self.progress_bar.hide()
         layout.addWidget(self.progress_bar)
 
+        self._stage_label = StyledLabel("", role="secondary")
+        self._stage_label.setAccessibleName("Generation stage")
+        self._stage_label.setWordWrap(True)
+        self._stage_label.hide()
+        layout.addWidget(self._stage_label)
+
         # Result controls
         result_layout = QHBoxLayout()
         result_layout.setSpacing(SPACING.md)
@@ -408,6 +414,12 @@ class VoiceCloningApp(QMainWindow):
 
     def hide_progress(self):
         self.progress_bar.hide()
+        self._stage_label.hide()
+
+    def set_stage_text(self, text: str):
+        """Set the generation stage text."""
+        self._stage_label.setText(text)
+        self._stage_label.show()
 
     def get_text_input(self) -> str:
         return self.text_input.toPlainText()

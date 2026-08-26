@@ -8,8 +8,10 @@ Extracts the voice cloning generation flow from the main application window:
 """
 
 import contextlib
+import shutil
 import tempfile
 import uuid
+from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal
@@ -73,6 +75,7 @@ class CloneThread(QThread):
 
     finished = Signal(str, str)
     error_occurred = Signal(str)
+    stage_changed = Signal(str)
 
     def __init__(
         self,
@@ -96,15 +99,18 @@ class CloneThread(QThread):
             output_dir = Path(tempfile.gettempdir()) / "voice_cloning"
             output_dir.mkdir(exist_ok=True)
 
-            # Generate unique filename
-            self.output_path = output_dir / f"output_{uuid.uuid4().hex}.wav"
+            # Use engine name + timestamp for readable filenames
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            self.output_path = output_dir / f"{self.engine_name}_{ts}.wav"
 
             # Use cached cloner or create a new one
             voice_cloner = self._voice_cloner
             if voice_cloner is None:
+                self.stage_changed.emit("Loading model...")
                 voice_cloner = VoiceCloner(speaker_wav=self.voice_path, engine=self.engine_name)
 
             # Generate audio
+            self.stage_changed.emit("Synthesizing...")
             voice_cloner.say(
                 self.text,
                 play_audio=False,
@@ -226,7 +232,7 @@ class CloneFlowController:
                 temp_voice = Path(tempfile.gettempdir()) / (
                     f"voice_{uuid.uuid4().hex}{Path(self._ui.get_voice_path()).suffix}"
                 )
-                temp_voice.write_bytes(Path(self._ui.get_voice_path()).read_bytes())
+                shutil.copyfile(self._ui.get_voice_path(), str(temp_voice))
                 self._temp_voice_file = str(temp_voice)
                 temp_voice_path = str(temp_voice)
             except (OSError, PermissionError, MemoryError) as e:
@@ -257,8 +263,13 @@ class CloneFlowController:
         )
         self._thread.finished.connect(self._on_finished)
         self._thread.error_occurred.connect(self._on_error)
+        self._thread.stage_changed.connect(self._on_stage_changed)
         self._thread.start()
         return True
+
+    def _on_stage_changed(self, stage: str):
+        """Handle stage change during generation."""
+        self._ui.set_stage_text(stage)
 
     def _on_finished(self, output_path: str, text: str):
         """Handle successful generation completion."""
