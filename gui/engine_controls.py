@@ -32,8 +32,8 @@ class EngineControlsBase(QWidget):
 
     parameters_changed = Signal(dict)
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self._setup_ui()
 
     def _setup_ui(self):
@@ -226,7 +226,7 @@ class MlxKokoroControls(EngineControlsBase):
     LANG_CODES = KOKORO_LANG_CODES
 
     def __init__(self, **kwargs):
-        super().__init__()
+        super().__init__(**kwargs)
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -351,7 +351,7 @@ class MlxCsmControls(EngineControlsBase):
     """Control widget for MLX CSM voice cloning."""
 
     def __init__(self, **kwargs):
-        super().__init__()
+        super().__init__(**kwargs)
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -414,7 +414,6 @@ class EngineControlsFactory:
         """
         controls_class = TTSFactory.get_controls_class(engine_name)
         if controls_class is not None:
-            descriptor = TTSFactory._registry.get(engine_name)
-            kwargs = dict(descriptor.default_kwargs) if descriptor else {}
+            kwargs = TTSFactory.get_default_kwargs(engine_name)
             return controls_class(**kwargs)
         return EngineControlsBase()

@@ -106,6 +106,12 @@ class TTSFactory:
         }
 
     @classmethod
+    def get_default_kwargs(cls, engine_name: str) -> dict[str, Any]:
+        """Return the default kwargs for a registered engine."""
+        descriptor = cls._registry.get(engine_name)
+        return dict(descriptor.default_kwargs) if descriptor else {}
+
+    @classmethod
     def get_controls_class(cls, engine_name: str) -> type | None:
         descriptor = cls._registry.get(engine_name)
         return descriptor.controls_class if descriptor else None
