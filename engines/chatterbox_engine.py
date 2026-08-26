@@ -1,9 +1,11 @@
+import importlib
 import logging
 import os
 from typing import Any, Literal
 
 import numpy as np
 
+from models.downloaders.chatterbox_downloader import CHATTERBOX_VARIANT_BACKENDS
 from models.exceptions import ModelNotInstalledError
 from models.model_registry import ModelRegistry, get_registry
 from tts_engine_base import TTSEngineBase
@@ -76,9 +78,10 @@ class ChatterboxEngine(TTSEngineBase):
 
             logger.info(f"Loading Chatterbox {self.variant} model...")
             try:
-                from chatterbox.tts import ChatterboxTTS
+                module_name, class_name = CHATTERBOX_VARIANT_BACKENDS[self._model_id]
+                backend_cls = getattr(importlib.import_module(module_name), class_name)
 
-                self._model = ChatterboxTTS.from_pretrained(device=self.device)
+                self._model = backend_cls.from_pretrained(device=self.device)
                 self._sample_rate = self._model.sr
                 logger.info(f"Chatterbox {self.variant} model loaded successfully")
             except ImportError as e:

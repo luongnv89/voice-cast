@@ -4,6 +4,14 @@
 
 ### Fixed
 
+- Chatterbox variant selection is now honored end-to-end: the engine loads
+  `ChatterboxTurboTTS` from `ResembleAI/chatterbox-turbo` for Turbo and
+  `ChatterboxTTS` from `ResembleAI/chatterbox` for Standard (previously both
+  variants loaded the same backend checkpoint regardless of the selection),
+  the downloader pins distinct repos and revisions per variant, and registry
+  install status no longer reports Turbo installed when only the Standard
+  cache exists (#56)
+
 - The `vcloner.py` CLI now exits with status 1 on every error path (missing
   required arguments, model-group passed as a generation engine, unusable
   `--download-models` invocations, and the `ModelNotInstalledError`,

@@ -15,19 +15,27 @@ from models.model_registry import get_registry
 
 logger = logging.getLogger("voice_cloner.models.chatterbox")
 
+# Variant/model-id → backend (module, class). Turbo (350M) and Standard (500M)
+# ship as separate checkpoints loaded by separate backend classes; this map is
+# the single source of truth shared by the engine loader and download fallback.
+CHATTERBOX_VARIANT_BACKENDS = {
+    "chatterbox-turbo": ("chatterbox.tts_turbo", "ChatterboxTurboTTS"),
+    "chatterbox-standard": ("chatterbox.tts", "ChatterboxTTS"),
+}
+
 
 class ChatterboxDownloader(BaseDownloader):
     """Downloader for Chatterbox TTS models."""
 
-    # HuggingFace repo IDs
+    # HuggingFace repo IDs — one distinct repo per variant.
     MODEL_REPOS = {
-        "chatterbox-turbo": "ResembleAI/chatterbox",
+        "chatterbox-turbo": "ResembleAI/chatterbox-turbo",
         "chatterbox-standard": "ResembleAI/chatterbox",
     }
 
     # Pinned Hugging Face revisions for safe, reproducible downloads.
     MODEL_REVISIONS = {
-        "chatterbox-turbo": "5bb1f6ee58e50c3b8d408bc82a6d3740c2db6e18",
+        "chatterbox-turbo": "749d1c1a46eb10492095d68fbcf55691ccf137cd",
         "chatterbox-standard": "5bb1f6ee58e50c3b8d408bc82a6d3740c2db6e18",
     }
 
@@ -113,7 +121,10 @@ class ChatterboxDownloader(BaseDownloader):
     ) -> Path:
         """Download by importing chatterbox which triggers auto-download."""
         try:
-            from chatterbox.tts import ChatterboxTTS
+            import importlib
+
+            module_name, class_name = CHATTERBOX_VARIANT_BACKENDS[model_id]
+            backend_cls = getattr(importlib.import_module(module_name), class_name)
 
             # This will trigger download if not cached
             # We can't get progress from this method unfortunately
@@ -130,7 +141,7 @@ class ChatterboxDownloader(BaseDownloader):
                 )
 
             # Load the model (this downloads if needed)
-            _ = ChatterboxTTS.from_pretrained(device="cpu")
+            _ = backend_cls.from_pretrained(device="cpu")
 
             elapsed = time.time() - start_time
             if progress_callback:
@@ -146,7 +157,8 @@ class ChatterboxDownloader(BaseDownloader):
                 )
 
             # Return the HF cache path
-            return get_registry().get_cache_dir("chatterbox") / "models--ResembleAI--chatterbox"
+            repo_id = self.MODEL_REPOS[model_id]
+            return get_registry().get_cache_dir("chatterbox") / f"models--{repo_id.replace('/', '--')}"
 
         except ImportError as e:
             logger.error("chatterbox-tts package not installed. Install with: pip install chatterbox-tts")
