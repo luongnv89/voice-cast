@@ -127,6 +127,7 @@ class TestModelRegistry:
         assert "coqui-xtts-v2" in model_ids
         assert "chatterbox-turbo" in model_ids
         assert "chatterbox-standard" in model_ids
+        assert "audio8-tts" in model_ids
 
     def test_get_model(self):
         """Test getting a specific model."""
@@ -172,6 +173,34 @@ class TestModelRegistry:
 
         turbo_models = self.registry.get_models_for_engine("chatterbox-turbo")
         assert [m.id for m in turbo_models] == ["chatterbox-turbo"]
+
+    def test_audio8_model_is_registered(self):
+        """Test that Audio8 model is registered in the registry."""
+        model = self.registry.get_model("audio8-tts")
+
+        assert model.id == "audio8-tts"
+        assert model.engine == "audio8-onnx"
+        assert model.name == "Audio8 TTS (1B)"
+        assert model.size_mb == 2000
+        assert model.description != ""
+
+    def test_audio8_engine_model_id_mapping(self):
+        """Test that audio8-onnx engine maps to audio8-tts model ID."""
+        assert self.registry.get_model_id_for_engine("audio8-onnx") == "audio8-tts"
+
+    def test_audio8_engine_group_aliases(self):
+        """Test that audio8 engine group aliases work."""
+        audio8_models = self.registry.get_models_for_engine("audio8")
+        assert len(audio8_models) == 1
+        assert audio8_models[0].id == "audio8-tts"
+
+        audio8_models2 = self.registry.get_models_for_engine("audio8-onnx")
+        assert len(audio8_models2) == 1
+        assert audio8_models2[0].id == "audio8-tts"
+
+    def test_audio8_engine_for_model(self):
+        """Test getting engine name for Audio8 model."""
+        assert self.registry.get_engine_for_model("audio8-tts") == "audio8-onnx"
 
     def test_reset_clears_and_reloads(self):
         """Test reset restores registry to default state."""
@@ -308,6 +337,14 @@ class TestModelDownloader:
 
         downloader = ModelDownloader()
         assert isinstance(downloader._get_downloader("mlx-audio"), MlxDownloader)
+
+    def test_audio8_downloader_is_registered(self):
+        """Test Audio8 models have an explicit downloader route."""
+        from models.downloaders.audio8_downloader import Audio8Downloader
+        from models.model_downloader import ModelDownloader
+
+        downloader = ModelDownloader()
+        assert isinstance(downloader._get_downloader("audio8-onnx"), Audio8Downloader)
 
 
 def _expected_backend_data_root() -> Path:
@@ -454,6 +491,7 @@ def test_engine_auto_download_defaults_to_false():
         ("engines/coqui_engine.py", "CoquiEngine"),
         ("engines/chatterbox_engine.py", "ChatterboxEngine"),
         ("engines/mlx_audio_engine.py", "MlxAudioEngine"),
+        ("engines/audio8_engine.py", "Audio8Engine"),
     ]
 
     for path, class_name in engine_specs:
