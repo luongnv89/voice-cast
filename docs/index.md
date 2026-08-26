@@ -27,6 +27,7 @@ If you're new to VoiceCast, start here:
 | [Architecture](architecture.md) | System design with diagrams |
 | [Model Management](model-management.md) | Model registry, downloader, and cache behavior |
 | [Development](development.md) | Contributing and extending |
+| [Agent Environment](agent-environment.md) | AI-agent setup notes: toolchain, prerequisites, env vars, commands of record |
 | [Troubleshooting](troubleshooting.md) | Common issues and fixes |
 
 ## Quick Links
