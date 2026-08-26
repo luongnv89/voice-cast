@@ -427,7 +427,9 @@ class TestVoiceClonerCache:
     @pytest.fixture
     def speaker_file(self, tmp_path):
         """Create a temporary speaker file for tests."""
-        return str(tmp_path / "speaker.wav")
+        f = tmp_path / "speaker.wav"
+        f.write_bytes(b"fake audio data")
+        return str(f)
 
     def test_cache_miss_creates_new_cloner(self, speaker_file):
         """First access must create a new VoiceCloner."""
@@ -455,10 +457,12 @@ class TestVoiceClonerCache:
         from gui.clone_flow_controller import VoiceClonerCache
 
         cache = VoiceClonerCache()
-        speaker_a = str(tmp_path / "speaker_a.wav")
-        speaker_b = str(tmp_path / "speaker_b.wav")
-        cache.get("coqui", speaker_a)
-        cache.get("chatterbox-turbo", speaker_b)
+        speaker_a = tmp_path / "speaker_a.wav"
+        speaker_a.write_bytes(b"fake audio data")
+        speaker_b = tmp_path / "speaker_b.wav"
+        speaker_b.write_bytes(b"fake audio data")
+        cache.get("coqui", str(speaker_a))
+        cache.get("chatterbox-turbo", str(speaker_b))
 
         assert cache.size == 2
 
@@ -467,10 +471,12 @@ class TestVoiceClonerCache:
         from gui.clone_flow_controller import VoiceClonerCache
 
         cache = VoiceClonerCache()
-        speaker_a = str(tmp_path / "speaker_a.wav")
-        speaker_b = str(tmp_path / "speaker_b.wav")
-        cache.get("coqui", speaker_a)
-        cache.get("coqui", speaker_b)
+        speaker_a = tmp_path / "speaker_a.wav"
+        speaker_a.write_bytes(b"fake audio data")
+        speaker_b = tmp_path / "speaker_b.wav"
+        speaker_b.write_bytes(b"fake audio data")
+        cache.get("coqui", str(speaker_a))
+        cache.get("coqui", str(speaker_b))
 
         assert cache.size == 2
 
@@ -479,10 +485,12 @@ class TestVoiceClonerCache:
         from gui.clone_flow_controller import VoiceClonerCache
 
         cache = VoiceClonerCache()
-        speaker_a = str(tmp_path / "speaker_a.wav")
-        speaker_b = str(tmp_path / "speaker_b.wav")
-        cache.get("coqui", speaker_a)
-        cache.get("chatterbox-turbo", speaker_b)
+        speaker_a = tmp_path / "speaker_a.wav"
+        speaker_a.write_bytes(b"fake audio data")
+        speaker_b = tmp_path / "speaker_b.wav"
+        speaker_b.write_bytes(b"fake audio data")
+        cache.get("coqui", str(speaker_a))
+        cache.get("chatterbox-turbo", str(speaker_b))
 
         assert cache.size == 2
 
@@ -495,15 +503,17 @@ class TestVoiceClonerCache:
         from gui.clone_flow_controller import VoiceClonerCache
 
         cache = VoiceClonerCache()
-        speaker_a = str(tmp_path / "speaker_a.wav")
-        speaker_b = str(tmp_path / "speaker_b.wav")
-        cache.get("coqui", speaker_a)
-        cache.get("chatterbox-turbo", speaker_a)
-        cache.get("coqui", speaker_b)
+        speaker_a = tmp_path / "speaker_a.wav"
+        speaker_a.write_bytes(b"fake audio data")
+        speaker_b = tmp_path / "speaker_b.wav"
+        speaker_b.write_bytes(b"fake audio data")
+        cache.get("coqui", str(speaker_a))
+        cache.get("chatterbox-turbo", str(speaker_a))
+        cache.get("coqui", str(speaker_b))
 
         assert cache.size == 3
 
-        cache.invalidate(speaker_wav=speaker_a)
+        cache.invalidate(speaker_wav=str(speaker_a))
 
         assert cache.size == 1
 
@@ -512,10 +522,12 @@ class TestVoiceClonerCache:
         from gui.clone_flow_controller import VoiceClonerCache
 
         cache = VoiceClonerCache()
-        speaker_a = str(tmp_path / "speaker_a.wav")
-        speaker_b = str(tmp_path / "speaker_b.wav")
-        cache.get("coqui", speaker_a)
-        cache.get("chatterbox-turbo", speaker_b)
+        speaker_a = tmp_path / "speaker_a.wav"
+        speaker_a.write_bytes(b"fake audio data")
+        speaker_b = tmp_path / "speaker_b.wav"
+        speaker_b.write_bytes(b"fake audio data")
+        cache.get("coqui", str(speaker_a))
+        cache.get("chatterbox-turbo", str(speaker_b))
 
         assert cache.size == 2
 
