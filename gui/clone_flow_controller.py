@@ -1,0 +1,215 @@
+"""Clone flow controller for VoiceCloningApp.
+
+Extracts the voice cloning generation flow from the main application window:
+- CloneThread: QThread for running TTS generation without blocking the UI
+- CloneFlowController: Manages the clone lifecycle (start, finish, error, reset)
+"""
+
+import tempfile
+import uuid
+from pathlib import Path
+
+from PySide6.QtCore import QThread, Signal
+from PySide6.QtWidgets import QMessageBox
+
+from voice_cloner import VoiceCloner
+
+
+class CloneThread(QThread):
+    """Thread for running TTS generation without blocking the UI."""
+
+    finished = Signal(str, str)
+    error_occurred = Signal(str)
+
+    def __init__(self, text: str, voice_path: str, engine_name: str, engine_params: dict):
+        super().__init__()
+        self.text = text
+        self.voice_path = voice_path
+        self.engine_name = engine_name
+        self.engine_params = engine_params
+        self.output_path = None
+
+    def run(self):
+        try:
+            # Create temporary output directory
+            output_dir = Path(tempfile.gettempdir()) / "voice_cloning"
+            output_dir.mkdir(exist_ok=True)
+
+            # Generate unique filename
+            self.output_path = output_dir / f"output_{uuid.uuid4().hex}.wav"
+
+            # Create VoiceCloner with selected engine
+            voice_cloner = VoiceCloner(
+                speaker_wav=self.voice_path, engine=self.engine_name
+            )
+
+            # Generate audio
+            voice_cloner.say(
+                self.text,
+                play_audio=False,
+                save_audio=True,
+                output_file=str(self.output_path),
+                **self.engine_params,
+            )
+            self.finished.emit(str(self.output_path), self.text)
+        except Exception as e:
+            self.error_occurred.emit(str(e))
+
+
+class CloneFlowController:
+    """Manages the clone generation lifecycle.
+
+    Coordinates UI state, validation, thread management, and result handling
+    for the voice cloning flow. Delegated to by VoiceCloningApp.
+    """
+
+    def __init__(self, ui_delegate):
+        """Initialize the controller.
+
+        Args:
+            ui_delegate: Object providing UI access with these methods:
+                - warning(title, message)
+                - critical(title, message)
+                - question(title, message, default_button)
+                - disable_generate()
+                - enable_generate()
+                - set_generate_text(text)
+                - show_generate()
+                - hide_play_save()
+                - show_play_save()
+                - disable_voice_select()
+                - enable_voice_select()
+                - disable_engine_combo()
+                - enable_engine_combo()
+                - show_progress()
+                - hide_progress()
+                - get_text_input() -> str
+                - get_voice_path() -> str | None
+                - get_engine_name() -> str
+                - get_engine_params() -> dict
+                - is_voice_required() -> bool
+                - is_model_installed(model_id) -> bool
+                - get_model_id_for_engine(engine_name) -> str
+                - switch_to_model_manager()
+                - is_thread_running() -> bool
+        """
+        self._ui = ui_delegate
+        self._thread = None
+        self._temp_voice_file = None
+
+    @property
+    def is_running(self) -> bool:
+        """Whether a generation is currently in progress."""
+        return self._thread is not None and self._thread.isRunning()
+
+    def start(self) -> bool:
+        """Start the voice cloning process.
+
+        Returns:
+            True if generation started, False if validation failed.
+        """
+        # Validate voice file requirement
+        if self._ui.is_voice_required() and not self._ui.get_voice_path():
+            self._ui.warning(
+                "Missing Voice Reference",
+                "Please select an audio file (.wav, .mp3, .ogg, .flac) as voice reference.",
+            )
+            return False
+
+        # Validate text input
+        text = self._ui.get_text_input().strip()
+        if not text:
+            self._ui.warning(self, "Missing Text", "Please enter text to generate audio.")
+            return False
+
+        # Check if a thread is already running
+        if self.is_running:
+            self._ui.warning(
+                "Generation In Progress",
+                "Please wait for the current generation to complete.",
+            )
+            return False
+
+        # Get engine and model info
+        engine_name = self._ui.get_engine_name()
+        model_id = self._ui.get_model_id_for_engine(engine_name)
+
+        # Check if model is installed
+        if not self._ui.is_model_installed(model_id):
+            reply = self._ui.question(
+                "Model Not Installed",
+                f"The model '{model_id}' is not installed.\n\n"
+                "Would you like to go to the Model Manager to download it?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes,
+            )
+            if reply == QMessageBox.Yes:
+                self._ui.switch_to_model_manager()
+            return False
+
+        # Prepare voice file
+        temp_voice_path = ""
+        if self._ui.is_voice_required():
+            try:
+                temp_voice = Path(tempfile.gettempdir()) / (
+                    f"voice_{uuid.uuid4().hex}{Path(self._ui.get_voice_path()).suffix}"
+                )
+                temp_voice.write_bytes(Path(self._ui.get_voice_path()).read_bytes())
+                self._temp_voice_file = str(temp_voice)
+                temp_voice_path = str(temp_voice)
+            except (OSError, PermissionError, MemoryError) as e:
+                self._reset_ui()
+                self._ui.critical("File Error", f"Cannot read voice file: {e}")
+                return False
+
+        # Disable UI during processing
+        self._ui.disable_generate()
+        self._ui.set_generate_text("Generating audio...")
+        self._ui.hide_play_save()
+        self._ui.disable_voice_select()
+        self._ui.disable_engine_combo()
+        self._ui.show_progress()
+
+        # Get engine parameters and start thread
+        engine_params = self._ui.get_engine_params() if hasattr(self._ui, "get_engine_params") else {}
+
+        self._thread = CloneThread(
+            text=text,
+            voice_path=temp_voice_path,
+            engine_name=engine_name,
+            engine_params=engine_params,
+        )
+        self._thread.finished.connect(self._on_finished)
+        self._thread.error_occurred.connect(self._on_error)
+        self._thread.start()
+        return True
+
+    def _on_finished(self, output_path: str, text: str):
+        """Handle successful generation completion."""
+        self._ui.current_audio = output_path
+        self._cleanup_temp()
+        self._reset_ui()
+        self._ui.show_play_save()
+
+    def _on_error(self, message: str):
+        """Handle generation error."""
+        self._cleanup_temp()
+        self._reset_ui()
+        self._ui.critical("Generation Error", f"Failed to generate audio:\n\n{message}")
+
+    def _reset_ui(self):
+        """Reset UI to normal state after generation."""
+        self._ui.enable_generate()
+        self._ui.set_generate_text("Generate Audio")
+        self._ui.enable_voice_select()
+        self._ui.enable_engine_combo()
+        self._ui.hide_progress()
+
+    def _cleanup_temp(self):
+        """Clean up temporary voice file."""
+        if self._temp_voice_file:
+            try:
+                Path(self._temp_voice_file).unlink(missing_ok=True)
+            except OSError:
+                pass
+            self._temp_voice_file = None
