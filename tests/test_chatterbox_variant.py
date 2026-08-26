@@ -9,6 +9,8 @@ import sys
 import types
 from unittest.mock import MagicMock
 
+import pytest
+
 try:
     from engines.chatterbox_engine import CHATTERBOX_VARIANT_BACKENDS
 except ImportError:  # pre-fix tree has no variant-to-checkpoint map
@@ -120,7 +122,7 @@ class TestEngineCheckpoints:
 
     def test_missing_model_names_selected_variant_id(self):
         engine = self._make_engine("standard")
-        with __import__("pytest").raises(Exception) as excinfo:
+        with pytest.raises(Exception) as excinfo:
             _ = engine.model
         assert engine._model_id == "chatterbox-standard"
         assert "chatterbox-standard" in str(excinfo.value)
