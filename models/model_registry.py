@@ -74,7 +74,7 @@ class ModelRegistry:
             name="Chatterbox Turbo",
             size_mb=350,
             description="Fast English voice cloning (350M parameters). Supports paralinguistic tags like [laugh].",
-            model_path_checker="ResembleAI/chatterbox",
+            model_path_checker="ResembleAI/chatterbox-turbo",
         ),
         ModelInfo(
             id="chatterbox-standard",
