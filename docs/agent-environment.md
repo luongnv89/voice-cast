@@ -36,10 +36,12 @@ pip install sounddevice soundfile rich numpy
 pip install -e . --no-deps
 ```
 
-The test suite mocks heavyweight modules (`torch`, `torchaudio`, `TTS`,
-`chatterbox-tts`, `transformers` are **not** imported by tests) — see the
-`sys.modules` stubs at the top of `tests/test_voice_cloner.py`. You do not need
-the ML stack to run tests.
+The test suite never requires heavyweight modules (`torch`, `TTS`,
+`chatterbox`, `mlx_audio`, `transformers`): `tests/conftest.py` installs a
+meta-path finder that serves lightweight stubs for these — but only when the
+real package is absent, so environments that have them exercise the real
+imports. Stubbing is centralized and order-independent; no test file mutates
+import state itself. You do not need the ML stack to run tests.
 
 ### Bootstrapping from the lockfile (proven)
 

@@ -28,6 +28,15 @@
   `requirements.txt` exists); dependency scanning remains in the non-blocking
   Security Scan job
 
+### Testing
+
+- Replaced per-file module-level import stubs in `tests/test_voice_cloner.py`,
+  `tests/test_tts_factory.py`, and `tests/test_engine_controls.py` with a single
+  meta-path finder in `tests/conftest.py` that stubs heavyweight optional
+  dependencies (`torch`, `transformers`, `TTS`, `chatterbox`, `mlx_audio`) only
+  when genuinely absent; removes order-dependent mock leakage (the
+  `pop("tts_factory")` workaround) so every test file passes individually (#66)
+
 ## v0.2.0 — 2026-03-18
 
 First tagged release of VoiceCast (formerly VoiceCloner).
