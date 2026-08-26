@@ -93,6 +93,12 @@ jobs:
 
       - name: Run pre-commit
         uses: pre-commit/action@v3.0.1
+        env:
+          # The safety hook needs a pinned lockfile and network DB access;
+          # .pre-commit-config.yaml already skips it for CI (ci.skip is only
+          # honored by pre-commit.ci). Dependency scanning stays in the
+          # non-blocking Security Scan job (`safety check ... || true`).
+          SKIP: python-safety-dependencies-check
 
   security:
     name: Security Scan

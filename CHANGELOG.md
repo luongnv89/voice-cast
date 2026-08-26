@@ -7,6 +7,18 @@
 - Added `docs/agent-environment.md` with agent-facing setup and run notes (#46)
 - Added `CLAUDE.md` and `AGENTS.md` at the repo root pointing to the environment notes (#47, #48)
 
+### Infrastructure
+
+- Added fully pinned `requirements.txt` (universal uv lock of `pyproject.toml`
+  runtime deps) so the CI security job's `safety check` and the pre-commit
+  safety hook resolve; documented regeneration in `docs/agent-environment.md`
+  (#49)
+- CI pre-commit job now sets `SKIP=python-safety-dependencies-check`, matching
+  the skip already declared in `.pre-commit-config.yaml` (`ci.skip` is only
+  honored by pre-commit.ci, so the hook otherwise runs on GitHub Actions once
+  `requirements.txt` exists); dependency scanning remains in the non-blocking
+  Security Scan job
+
 ## v0.2.0 — 2026-03-18
 
 First tagged release of VoiceCast (formerly VoiceCloner).
