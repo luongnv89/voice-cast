@@ -409,8 +409,10 @@ class ModelManagerWidget(QWidget):
 
     def refresh_models(self):
         """Refresh model status from registry."""
+        # Single sweep: call list_models() once and dispatch by engine
+        all_models = self._registry.list_models()
         for engine_name, section in self._engine_sections.items():
-            for model in self._registry.list_models():
+            for model in all_models:
                 if model.engine == engine_name:
                     section.refresh_model(model)
 
