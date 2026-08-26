@@ -1,13 +1,14 @@
 import argparse
 import logging
 import os
+import sys
 
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.progress import BarColumn, DownloadColumn, Progress, SpinnerColumn, TextColumn, TransferSpeedColumn
 from rich.table import Table
 
-from models import DownloadProgress, ModelDownloader, ModelRegistry
+from models import DownloadProgress, ModelDownloader, get_registry
 from models.exceptions import ModelNotInstalledError
 from tts_factory import TTSFactory, bootstrap_engines
 from voice_cloner import VoiceCloner
@@ -21,7 +22,7 @@ console = Console()
 
 def list_models():
     """Display a table of all available models and their status."""
-    registry = ModelRegistry()
+    registry = get_registry()
     models = registry.list_models()
 
     table = Table(title="Available TTS Models")
@@ -45,7 +46,7 @@ def list_models():
 
 def download_models(model_ids: list[str], engine: str | None = None):
     """Download specified models with progress display."""
-    registry = ModelRegistry()
+    registry = get_registry()
     downloader = ModelDownloader()
 
     # Determine which models to download
@@ -53,7 +54,7 @@ def download_models(model_ids: list[str], engine: str | None = None):
         engine_models = registry.get_models_for_engine(engine)
         if not engine_models:
             console.print(f"[red]No models found for engine:[/red] {engine}")
-            return
+            sys.exit(1)
         models_to_download = [m.id for m in engine_models]
         console.print(f"[bold]Downloading all models for engine: {engine}[/bold]")
     else:
@@ -203,7 +204,7 @@ Examples:
         if not args.download_models and not args.engine:
             console.print("[red]Error:[/red] Specify model IDs or use --engine to download all models for an engine.")
             console.print("Example: [cyan]python vcloner.py --download-models --engine chatterbox[/cyan]")
-            return
+            sys.exit(1)
 
         engine_filter = args.engine if args.download_models == [] else None
         download_models(args.download_models, engine=engine_filter)
@@ -224,7 +225,7 @@ Examples:
     if not args.input_voice or not args.text or not args.output_file:
         parser.print_help()
         console.print("\n[red]Error:[/red] -i, -t, and -o are required for audio generation.")
-        return
+        sys.exit(1)
 
     # Ensure the directory for the output file exists
     output_dir = os.path.dirname(args.output_file)
@@ -237,7 +238,7 @@ Examples:
         if selected_engine not in available_engines:
             console.print(f"[red]Error:[/red] '{selected_engine}' is a model group, not a generation engine.")
             console.print(f"Choose one of: [cyan]{engines_help}[/cyan]")
-            return
+            sys.exit(1)
 
         logger.info(f"  Engine: {selected_engine}")
         logger.info(f"  Reference voice: {args.input_voice}")
@@ -265,13 +266,17 @@ Examples:
         console.print(f"\n[red]Model not installed:[/red] {e.model_id}")
         console.print(f"Download it with: [cyan]{e.install_command}[/cyan]")
         console.print("Or use [cyan]--list-models[/cyan] to see all available models.")
+        sys.exit(1)
     except FileNotFoundError:
         logger.error(f"[bold red]Error:[/bold red] Input voice file not found: {args.input_voice}")
+        sys.exit(1)
     except ImportError as e:
         logger.error(f"[bold red]Missing dependency:[/bold red] {e}")
         logger.info("Install required package with: pip install <package-name>")
+        sys.exit(1)
     except Exception as e:
         logger.error(f"[bold red]Error:[/bold red] {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

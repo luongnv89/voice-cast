@@ -4,6 +4,23 @@
 
 ### Fixed
 
+- The `vcloner.py` CLI now exits with status 1 on every error path (missing
+  required arguments, model-group passed as a generation engine, unusable
+  `--download-models` invocations, and the `ModelNotInstalledError`,
+  `FileNotFoundError`, `ImportError`, and catch-all exception handlers) so
+  scripts and CI can detect failures instead of observing exit code 0 (#58)
+
+- `VoiceCloner` fails fast at construction with `ValueError` when an engine
+  requires reference audio but `speaker_wav` is empty or `None`, instead of
+  deferring the failure into `engine.generate()`; engine instances are now
+  also honored via their `requires_reference_audio` attribute (#58)
+
+- All production registry access is routed through the documented
+  `get_registry()` singleton (`vcloner.py` list/download helpers and the GUI
+  Model Manager previously constructed private `ModelRegistry()` instances,
+  so listings could disagree with the main window's install state); an AST
+  guard test pins `ModelRegistry()` construction to its definition module (#59)
+
 - Model downloads now stream progress through the previously unwired callback
   wrappers (`HuggingFaceProgressCallback`, `CoquiProgressCallback`) instead of
   jumping 0→100%: Chatterbox and MLX forward `snapshot_download` bar updates

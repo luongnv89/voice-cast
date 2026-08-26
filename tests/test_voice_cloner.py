@@ -45,6 +45,31 @@ class TestInit:
         ):
             VoiceCloner(speaker_wav="nonexistent.wav")
 
+    @pytest.mark.parametrize("falsy_path", ["", None])
+    def test_falsy_speaker_path_raises_before_engine_call(self, falsy_path):
+        """A falsy reference path fails at construction, never inside engine.generate()."""
+        with (
+            patch("voice_cloner.TTSFactory.get_engine_metadata", return_value={"requires_reference_audio": True}),
+            patch("voice_cloner.TTSFactory.create") as mock_create,
+            pytest.raises(ValueError, match="speaker reference audio path is required"),
+        ):
+            VoiceCloner(speaker_wav=falsy_path)
+        mock_create.assert_not_called()
+
+    def test_engine_instance_requiring_audio_rejects_falsy_path(self):
+        engine = MagicMock()
+        engine.name = "mock_engine"
+        engine.requires_reference_audio = True
+        with pytest.raises(ValueError, match="speaker reference audio path is required"):
+            VoiceCloner(speaker_wav="", engine=engine)
+
+    def test_engine_instance_without_reference_audio_allows_empty_path(self):
+        engine = MagicMock()
+        engine.name = "mock_engine"
+        engine.requires_reference_audio = False
+        cloner = VoiceCloner(speaker_wav="", engine=engine)
+        assert cloner.engine is engine
+
     def test_from_coqui(self):
         eng = MagicMock()
         eng.name = "coqui"
