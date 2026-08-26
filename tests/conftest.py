@@ -42,13 +42,16 @@ class _OptionalDependencyFinder(MetaPathFinder):
             return None
         type(self)._resolving = True
         try:
-            importlib.util.find_spec(fullname)
+            installed = importlib.util.find_spec(fullname)
         except ImportError:
-            return spec_from_loader(fullname, _StubLoader())
-        else:
+            # A partial/None sys.modules entry means the real module is
+            # already mid-import; let the normal machinery resolve it.
             return None
         finally:
             type(self)._resolving = False
+        if installed is None:
+            return spec_from_loader(fullname, _StubLoader())
+        return None
 
 
 sys.meta_path.insert(0, _OptionalDependencyFinder())
