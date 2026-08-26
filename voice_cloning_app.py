@@ -139,13 +139,11 @@ class VoiceCloningApp(QMainWindow):
         """Clean up resources when window closes."""
         # Stop any playing audio
         if self._audio.audio_available:
-            try:
+            with contextlib.suppress(Exception):
                 import pygame
 
                 pygame.mixer.music.stop()
                 pygame.mixer.quit()
-            except Exception:
-                pass
 
         # Wait for model downloads before widgets are destroyed.
         if self.model_manager:
