@@ -105,11 +105,13 @@ and security jobs.
 
 ## Known gaps
 
-- **No lockfile yet.** Sprint 0 of the modernization plan supplies one. Until
-  then, installs resolve loose version ranges from `pyproject.toml`, and the
-  commands above may fail locally even though they pass in CI.
-- **No `requirements.txt`.** The CI *security* job references one, but the step
-  is non-blocking (`|| true`) and the file does not exist.
+- **Lockfile covers runtime deps only, and is not used for installs.**
+  `requirements.txt` is a fully pinned universal lock generated from
+  `pyproject.toml` (`uv pip compile pyproject.toml --universal -o
+  requirements.txt`). It exists so the CI *security* job and the pre-commit
+  safety hook can scan real pins; CI/local installs still resolve loose
+  ranges from `pyproject.toml`, so regenerate the lock whenever those
+  dependencies change (`tests/test_requirements_lock.py` enforces sync).
 
 ## See also
 
