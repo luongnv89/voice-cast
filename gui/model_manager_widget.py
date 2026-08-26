@@ -31,7 +31,7 @@ from gui.theme import (
     generate_scrollarea_style,
     get_theme_manager,
 )
-from models import DownloadProgress, ModelDownloader, ModelRegistry
+from models import DownloadProgress, ModelDownloader, get_registry
 from models.model_info import ModelInfo
 
 logger = logging.getLogger("voice_cloner.gui.model_manager")
@@ -327,7 +327,7 @@ class ModelManagerWidget(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._registry = ModelRegistry()
+        self._registry = get_registry()
         self._download_threads: dict[str, ModelDownloadThread] = {}
         self._engine_sections: dict[str, EngineSection] = {}
         self._shutting_down = False

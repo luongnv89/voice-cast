@@ -77,9 +77,16 @@ class VoiceCloner:
                 requires_voice = metadata.get("requires_reference_audio", True)
             except ValueError:
                 pass  # Unknown engine, assume it needs voice file
+        else:
+            requires_voice = getattr(engine, "requires_reference_audio", True)
+
+        # Fail fast when reference audio is required but no path was provided,
+        # instead of deferring the failure into engine.generate().
+        if requires_voice and not self.speaker_wav:
+            raise ValueError("A speaker reference audio path is required by this engine but was not provided.")
 
         # Ensure the speaker reference file exists if required
-        if requires_voice and self.speaker_wav and not os.path.exists(self.speaker_wav):
+        if requires_voice and not os.path.exists(self.speaker_wav):
             logger.error(f"Speaker reference file not found: {self.speaker_wav}")
             raise FileNotFoundError(f"Speaker reference file not found: {self.speaker_wav}")
 

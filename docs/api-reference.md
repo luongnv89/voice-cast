@@ -61,6 +61,7 @@ cloner = VoiceCloner(
 **Model download behavior:** VoiceCast does not download model files during normal initialization or generation. Use `VoiceCloner.download_model()` or `python vcloner.py --download-models <model-id>` first. Missing models raise `ModelNotInstalledError`.
 
 **Raises:**
+- `ValueError` - If the engine requires reference audio but `speaker_wav` is empty or not provided (fails fast, before any engine is created)
 - `FileNotFoundError` - If speaker reference file doesn't exist
 - `ValueError` - If unknown engine name is provided
 - `ModelNotInstalledError` - If generation needs a model that has not been downloaded
