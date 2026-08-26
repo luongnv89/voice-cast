@@ -30,6 +30,8 @@ class EngineDescriptor:
                 import chatterbox  # noqa: F401
             elif "mlx" in self.name.lower():
                 import mlx_audio  # noqa: F401
+            elif "audio8" in self.name.lower():
+                import onnxruntime  # noqa: F401
             return True
         except ImportError:
             return False
@@ -207,6 +209,23 @@ def _register_default_engines():
         )
     except ImportError as e:
         logger.warning(f"MLX Audio engines not available: {e}")
+
+    try:
+        from engines.audio8_engine import Audio8Engine
+        from gui.engine_controls import Audio8Controls
+
+        TTSFactory.register(
+            EngineDescriptor(
+                name="audio8-onnx",
+                engine_class=Audio8Engine,
+                display_name="Audio8 TTS (1B)",
+                requires_reference_audio=True,
+                supports_preset_voices=False,
+                controls_class=Audio8Controls,
+            )
+        )
+    except ImportError as e:
+        logger.warning(f"Audio8 engine not available: {e}")
 
 
 def bootstrap_engines():
