@@ -330,6 +330,7 @@ class VoiceCloningApp(QMainWindow):
         """Handle engine selection change."""
         engine_name = self.engine_combo.currentData()
         self._update_engine_controls(engine_name)
+        self._clone_flow.engine_changed(engine_name)
 
     # ------------------------------------------------------------------ #
     # Voice file selection

@@ -3,16 +3,68 @@
 Extracts the voice cloning generation flow from the main application window:
 - CloneThread: QThread for running TTS generation without blocking the UI
 - CloneFlowController: Manages the clone lifecycle (start, finish, error, reset)
+- VoiceClonerCache: Caches VoiceCloner instances per engine to avoid reloading
+  multi-GB model weights on every generation.
 """
 
 import tempfile
 import uuid
 from pathlib import Path
+from typing import Any
 
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import QMessageBox
 
 from voice_cloner import VoiceCloner
+
+
+class VoiceClonerCache:
+    """Cache VoiceCloner instances per (engine, speaker_wav) to avoid
+    reloading multi-GB model weights on every generation.
+
+    The cache is invalidated when the engine name or speaker_wav path changes.
+    """
+
+    def __init__(self):
+        self._cache: dict[tuple[str, str], VoiceCloner] = {}
+
+    def get(self, engine_name: str, speaker_wav: str) -> VoiceCloner:
+        """Get or create a VoiceCloner for the given engine and speaker.
+
+        Args:
+            engine_name: Engine identifier (e.g., "coqui", "chatterbox-turbo").
+            speaker_wav: Path to speaker reference audio file.
+
+        Returns:
+            A VoiceCloner instance (cached if possible).
+        """
+        key = (engine_name, speaker_wav)
+        if key not in self._cache:
+            self._cache[key] = VoiceCloner(speaker_wav=speaker_wav, engine=engine_name)
+        return self._cache[key]
+
+    def invalidate(self, engine_name: str | None = None, speaker_wav: str | None = None):
+        """Invalidate cache entries.
+
+        If engine_name is provided, invalidate all entries for that engine.
+        If speaker_wav is provided, invalidate all entries for that speaker.
+        If both are None, clear the entire cache.
+        """
+        if engine_name is None and speaker_wav is None:
+            self._cache.clear()
+            return
+
+        keys_to_remove = [
+            key for key in self._cache
+            if (engine_name is not None and key[0] == engine_name)
+            or (speaker_wav is not None and key[1] == speaker_wav)
+        ]
+        for key in keys_to_remove:
+            del self._cache[key]
+
+    @property
+    def size(self) -> int:
+        return len(self._cache)
 
 
 class CloneThread(QThread):
@@ -21,12 +73,20 @@ class CloneThread(QThread):
     finished = Signal(str, str)
     error_occurred = Signal(str)
 
-    def __init__(self, text: str, voice_path: str, engine_name: str, engine_params: dict):
+    def __init__(
+        self,
+        text: str,
+        voice_path: str,
+        engine_name: str,
+        engine_params: dict,
+        voice_cloner: VoiceCloner | None = None,
+    ):
         super().__init__()
         self.text = text
         self.voice_path = voice_path
         self.engine_name = engine_name
         self.engine_params = engine_params
+        self._voice_cloner = voice_cloner
         self.output_path = None
 
     def run(self):
@@ -38,10 +98,12 @@ class CloneThread(QThread):
             # Generate unique filename
             self.output_path = output_dir / f"output_{uuid.uuid4().hex}.wav"
 
-            # Create VoiceCloner with selected engine
-            voice_cloner = VoiceCloner(
-                speaker_wav=self.voice_path, engine=self.engine_name
-            )
+            # Use cached cloner or create a new one
+            voice_cloner = self._voice_cloner
+            if voice_cloner is None:
+                voice_cloner = VoiceCloner(
+                    speaker_wav=self.voice_path, engine=self.engine_name
+                )
 
             # Generate audio
             voice_cloner.say(
@@ -96,6 +158,7 @@ class CloneFlowController:
         self._ui = ui_delegate
         self._thread = None
         self._temp_voice_file = None
+        self._cloner_cache = VoiceClonerCache()
 
     @property
     def is_running(self) -> bool:
@@ -173,11 +236,15 @@ class CloneFlowController:
         # Get engine parameters and start thread
         engine_params = self._ui.get_engine_params() if hasattr(self._ui, "get_engine_params") else {}
 
+        # Get cached VoiceCloner (or create new one)
+        voice_cloner = self._cloner_cache.get(engine_name, temp_voice_path)
+
         self._thread = CloneThread(
             text=text,
             voice_path=temp_voice_path,
             engine_name=engine_name,
             engine_params=engine_params,
+            voice_cloner=voice_cloner,
         )
         self._thread.finished.connect(self._on_finished)
         self._thread.error_occurred.connect(self._on_error)
@@ -213,3 +280,11 @@ class CloneFlowController:
             except OSError:
                 pass
             self._temp_voice_file = None
+
+    def engine_changed(self, engine_name: str):
+        """Invalidate cloner cache when engine changes.
+
+        Args:
+            engine_name: The new engine name that was selected.
+        """
+        self._cloner_cache.invalidate(engine_name=engine_name)
