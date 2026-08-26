@@ -51,6 +51,7 @@ class VoiceCloningApp(QMainWindow):
         super().__init__()
         self.voice_path = None
         self.engine_controls = None
+        self._generate_enabled = False
         self._registry = get_registry()
         self._theme_manager = get_theme_manager()
         self._current_engine_requires_voice = True
@@ -138,13 +139,11 @@ class VoiceCloningApp(QMainWindow):
         """Clean up resources when window closes."""
         # Stop any playing audio
         if self._audio.audio_available:
-            try:
+            with contextlib.suppress(Exception):
                 import pygame
 
                 pygame.mixer.music.stop()
                 pygame.mixer.quit()
-            except Exception:
-                pass
 
         # Wait for model downloads before widgets are destroyed.
         if self.model_manager:
@@ -157,9 +156,7 @@ class VoiceCloningApp(QMainWindow):
 
     def _cleanup_temp_files(self):
         """Clean up temporary files."""
-        if self._clone_flow._temp_voice_file and Path(
-            self._clone_flow._temp_voice_file
-        ).exists():
+        if self._clone_flow._temp_voice_file and Path(self._clone_flow._temp_voice_file).exists():
             with contextlib.suppress(OSError):
                 Path(self._clone_flow._temp_voice_file).unlink()
 
@@ -219,6 +216,7 @@ class VoiceCloningApp(QMainWindow):
         self.text_input = StyledTextEdit()
         self.text_input.setPlaceholderText("Enter text to generate audio...")
         self.text_input.setMinimumHeight(120)
+        self.text_input.textChanged.connect(self._update_generate_state)
         text_layout.addWidget(self.text_input)
         text_group.setLayout(text_layout)
         layout.addWidget(text_group)
@@ -231,6 +229,7 @@ class VoiceCloningApp(QMainWindow):
         self.btn_select_voice = StyledButton("Select Voice File", variant="secondary")
         self.btn_select_voice.setAccessibleName("Select voice file")
         self.btn_select_voice.clicked.connect(self.select_voice_file)
+        self.btn_select_voice.clicked.connect(self._update_generate_state)
         voice_layout.addWidget(self.btn_select_voice)
 
         self.voice_label = StyledLabel("No voice file selected", role="muted")
@@ -255,9 +254,17 @@ class VoiceCloningApp(QMainWindow):
         self.btn_generate.setAccessibleName("Generate audio")
         self.btn_generate.setMinimumHeight(48)
         self.btn_generate.clicked.connect(self._on_generate_clicked)
+        self.btn_generate.setEnabled(False)
         layout.addWidget(self.btn_generate)
 
-        # Activity indicator
+        # Inline hint for missing inputs
+        self._generate_hint = StyledLabel(
+            "Select a voice file and enter text to generate audio",
+            role="muted",
+        )
+        self._generate_hint.setWordWrap(True)
+        self._generate_hint.hide()
+        layout.addWidget(self._generate_hint)
         self.progress_bar = StyledProgressBar()
         self.progress_bar.setAccessibleName("Generation progress")
         self.progress_bar.setRange(0, 0)  # indeterminate
@@ -283,6 +290,9 @@ class VoiceCloningApp(QMainWindow):
         result_layout.addWidget(self.btn_save)
         result_layout.addStretch()
         layout.addLayout(result_layout)
+
+        # Initialize generate button state based on current inputs
+        self._update_generate_state()
 
         layout.addStretch()
 
@@ -439,6 +449,28 @@ class VoiceCloningApp(QMainWindow):
     # ------------------------------------------------------------------ #
 
     @Slot()
+    def _update_generate_state(self):
+        """Enable/disable Generate button based on input validity.
+
+        Shows an inline hint naming what input is missing when disabled.
+        """
+        text = self.text_input.toPlainText().strip()
+        voice_valid = not self._current_engine_requires_voice or self.voice_path is not None
+        valid = bool(text) and voice_valid
+
+        if valid:
+            self.btn_generate.setEnabled(True)
+            self._generate_hint.hide()
+        else:
+            self.btn_generate.setEnabled(False)
+            parts = []
+            if not text:
+                parts.append("enter text")
+            if not voice_valid:
+                parts.append("select a voice file")
+            self._generate_hint.setText(f"Click Generate to start — please {' and '.join(parts)}.")
+            self._generate_hint.show()
+
     def _on_generate_clicked(self):
         """Start voice cloning process."""
         self._clone_flow.start()

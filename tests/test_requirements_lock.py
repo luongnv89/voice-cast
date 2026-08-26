@@ -73,15 +73,15 @@ def test_lockfile_consumers_reference_it_validly():
     assert "|| true" not in ci_workflow, "CI steps must be allowed to fail the job"
     assert "safety check" not in ci_workflow, "safety was replaced by pip-audit"
     pre_commit = _read(".pre-commit-config.yaml")
-    assert re.search(
-        r"^\s+entry:\s*scripts/pip_audit_lockfile\.sh\s*$", pre_commit, re.MULTILINE
-    ), "pre-commit must scan the lockfile via the shared pip-audit wrapper"
-    assert re.search(
-        r"^\s+files:\s*\^requirements\\\.txt\$\s*$", pre_commit, re.MULTILINE
-    ), "pre-commit pip-audit hook must target requirements.txt"
-    assert (
-        "python-safety-dependencies-check" not in pre_commit
-    ), "the replaced safety hook must not linger in config or skip lists"
+    assert re.search(r"^\s+entry:\s*scripts/pip_audit_lockfile\.sh\s*$", pre_commit, re.MULTILINE), (
+        "pre-commit must scan the lockfile via the shared pip-audit wrapper"
+    )
+    assert re.search(r"^\s+files:\s*\^requirements\\\.txt\$\s*$", pre_commit, re.MULTILINE), (
+        "pre-commit pip-audit hook must target requirements.txt"
+    )
+    assert "python-safety-dependencies-check" not in pre_commit, (
+        "the replaced safety hook must not linger in config or skip lists"
+    )
     assert os.path.isfile(audit_script), "the shared pip-audit wrapper must exist"
 
 
@@ -96,6 +96,6 @@ def test_pip_audit_baseline_is_explicit_and_wellformed():
     bad = [i for i in ids if not re.match(r"^(PYSEC|CVE|GHSA)-[A-Za-z0-9.\-]+$", i)]
     assert not bad, f"malformed advisory IDs in baseline: {bad}"
     assert "--ignore-vuln" in content, "IDs must be passed as --ignore-vuln args"
-    assert (
-        "--disable-pip" in content and "--no-deps" in content
-    ), "the fully pinned lockfile must be audited without pip installs"
+    assert "--disable-pip" in content and "--no-deps" in content, (
+        "the fully pinned lockfile must be audited without pip installs"
+    )

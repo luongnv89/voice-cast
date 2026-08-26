@@ -7,7 +7,6 @@ import uuid
 from pathlib import Path
 
 import pygame
-from PySide6.QtWidgets import QFileDialog, QMessageBox
 
 
 class AudioPlaybackController:
@@ -82,9 +81,7 @@ class AudioPlaybackController:
         if not self._current_audio:
             return False
 
-        file_path, _ = ui_delegate.get_save_filename(
-            f"cloned_voice_{uuid.uuid4().hex[:8]}.wav", "Wave Files (*.wav)"
-        )
+        file_path, _ = ui_delegate.get_save_filename(f"cloned_voice_{uuid.uuid4().hex[:8]}.wav", "Wave Files (*.wav)")
         if file_path:
             import shutil
 
