@@ -68,19 +68,20 @@ class ChatterboxDownloader(BaseDownloader):
             # Use huggingface_hub for downloading with progress
             from huggingface_hub import snapshot_download
 
-            download_kwargs: dict = {
-                "repo_id": repo_id,
-                "revision": self.MODEL_REVISIONS[model_id],
-                "cache_dir": str(get_registry().get_cache_dir("chatterbox")),
-            }
+            extra_kwargs: dict = {}
             if progress_callback:
                 hf_cb = HuggingFaceProgressCallback(model_id, total_size, progress_callback, start_time)
                 tqdm_class = make_hf_tqdm_class(hf_cb)
                 if tqdm_class is not None:
-                    download_kwargs["tqdm_class"] = tqdm_class
+                    extra_kwargs["tqdm_class"] = tqdm_class
 
             # Download the model into the same cache location the registry checks.
-            cache_dir = snapshot_download(**download_kwargs)
+            cache_dir = snapshot_download(
+                repo_id=repo_id,
+                revision=self.MODEL_REVISIONS[model_id],
+                cache_dir=str(get_registry().get_cache_dir("chatterbox")),
+                **extra_kwargs,
+            )
 
             # Calculate final progress
             elapsed = time.time() - start_time
