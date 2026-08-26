@@ -4,6 +4,8 @@ VoiceCast GUI components.
 Provides the desktop application UI built with PySide6.
 """
 
+from .audio_playback import AudioPlaybackController
+from .clone_flow_controller import CloneFlowController, CloneThread
 from .engine_controls import ChatterboxControls, CoquiControls, EngineControlsBase, EngineControlsFactory
 from .model_manager_widget import ModelManagerWidget
 from .styled_widgets import (
@@ -38,6 +40,11 @@ __all__ = [
     "CoquiControls",
     "ChatterboxControls",
     "EngineControlsFactory",
+    # Clone flow
+    "CloneThread",
+    "CloneFlowController",
+    # Audio playback
+    "AudioPlaybackController",
     # Model manager
     "ModelManagerWidget",
     # Theme system

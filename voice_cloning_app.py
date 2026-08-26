@@ -6,12 +6,9 @@ Main application window with voice cloning and model management tabs.
 
 import contextlib
 import sys
-import tempfile
-import uuid
 from pathlib import Path
 
-import pygame
-from PySide6.QtCore import QThread, Signal, Slot
+from PySide6.QtCore import Slot
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
     QApplication,
@@ -24,6 +21,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from gui.audio_playback import AudioPlaybackController
+from gui.clone_flow_controller import CloneFlowController
 from gui.engine_controls import EngineControlsFactory
 from gui.model_manager_widget import ModelManagerWidget
 from gui.styled_widgets import (
@@ -43,42 +42,6 @@ from gui.theme import (
 )
 from models.model_registry import get_registry
 from tts_factory import TTSFactory, bootstrap_engines
-from voice_cloner import VoiceCloner
-
-
-class CloneThread(QThread):
-    """Thread for running TTS generation without blocking the UI."""
-
-    finished = Signal(str, str)
-    error_occurred = Signal(str)
-
-    def __init__(self, text: str, voice_path: str, engine_name: str, engine_params: dict):
-        super().__init__()
-        self.text = text
-        self.voice_path = voice_path
-        self.engine_name = engine_name
-        self.engine_params = engine_params
-        self.output_path = None
-
-    def run(self):
-        try:
-            # Create temporary output directory
-            output_dir = Path(tempfile.gettempdir()) / "voice_cloning"
-            output_dir.mkdir(exist_ok=True)
-
-            # Generate unique filename
-            self.output_path = output_dir / f"output_{uuid.uuid4().hex}.wav"
-
-            # Create VoiceCloner with selected engine
-            voice_cloner = VoiceCloner(speaker_wav=self.voice_path, engine=self.engine_name)
-
-            # Generate audio
-            voice_cloner.say(
-                self.text, play_audio=False, save_audio=True, output_file=str(self.output_path), **self.engine_params
-            )
-            self.finished.emit(str(self.output_path), self.text)
-        except Exception as e:
-            self.error_occurred.emit(str(e))
 
 
 class VoiceCloningApp(QMainWindow):
@@ -86,14 +49,15 @@ class VoiceCloningApp(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.current_audio = None
         self.voice_path = None
         self.engine_controls = None
-        self.clone_thread = None
-        self._temp_voice_file = None
         self._registry = get_registry()
         self._theme_manager = get_theme_manager()
-        self._current_engine_requires_voice = True  # Track if current engine needs voice file
+        self._current_engine_requires_voice = True
+
+        # Extracted collaborators
+        self._audio = AudioPlaybackController()
+        self._clone_flow = CloneFlowController(self)
 
         self._setup_menu_bar()
         self._init_ui()
@@ -101,16 +65,12 @@ class VoiceCloningApp(QMainWindow):
         self.setMinimumSize(750, 650)
         self.setWindowIcon(QIcon(str(Path(__file__).parent / "icon.jpg")))
 
-        # Initialize pygame mixer for audio
-        self._audio_available = True
-        try:
-            pygame.mixer.init()
-        except pygame.error as e:
-            self._audio_available = False
-            print(f"Warning: Audio playback unavailable — pygame.mixer.init() failed: {e}")
-
         # Connect theme changes
         self._theme_manager.theme_changed.connect(self._on_theme_changed)
+
+    # ------------------------------------------------------------------ #
+    # Menu bar
+    # ------------------------------------------------------------------ #
 
     def _setup_menu_bar(self):
         """Set up the application menu bar."""
@@ -134,7 +94,7 @@ class VoiceCloningApp(QMainWindow):
 
         dark_action = QAction("Dark", self)
         dark_action.setCheckable(True)
-        dark_action.triggered.connect(lambda: self._set_theme(ThemeMode.DARK))
+        light_action.triggered.connect(lambda: self._set_theme(ThemeMode.DARK))
         theme_menu.addAction(dark_action)
         self._theme_actions[ThemeMode.DARK] = dark_action
 
@@ -170,17 +130,21 @@ class VoiceCloningApp(QMainWindow):
         if self.tab_widget.widget(index) == self.model_manager:
             self.model_manager.refresh_models()
 
+    # ------------------------------------------------------------------ #
+    # Window lifecycle
+    # ------------------------------------------------------------------ #
+
     def closeEvent(self, event):
         """Clean up resources when window closes."""
         # Stop any playing audio
-        if self._audio_available:
-            pygame.mixer.music.stop()
-            pygame.mixer.quit()
+        if self._audio.audio_available:
+            try:
+                import pygame
 
-        # Wait for thread to finish
-        if self.clone_thread and self.clone_thread.isRunning():
-            self.clone_thread.quit()
-            self.clone_thread.wait(1000)
+                pygame.mixer.music.stop()
+                pygame.mixer.quit()
+            except Exception:
+                pass
 
         # Wait for model downloads before widgets are destroyed.
         if self.model_manager:
@@ -193,12 +157,15 @@ class VoiceCloningApp(QMainWindow):
 
     def _cleanup_temp_files(self):
         """Clean up temporary files."""
-        if self._temp_voice_file and Path(self._temp_voice_file).exists():
+        if self._clone_flow._temp_voice_file and Path(
+            self._clone_flow._temp_voice_file
+        ).exists():
             with contextlib.suppress(OSError):
-                Path(self._temp_voice_file).unlink()
-        if self.current_audio and Path(self.current_audio).exists():
-            with contextlib.suppress(OSError):
-                Path(self.current_audio).unlink()
+                Path(self._clone_flow._temp_voice_file).unlink()
+
+    # ------------------------------------------------------------------ #
+    # UI initialization
+    # ------------------------------------------------------------------ #
 
     def _init_ui(self):
         """Initialize the user interface."""
@@ -287,7 +254,7 @@ class VoiceCloningApp(QMainWindow):
         self.btn_generate = StyledButton("Generate Audio", variant="primary")
         self.btn_generate.setAccessibleName("Generate audio")
         self.btn_generate.setMinimumHeight(48)
-        self.btn_generate.clicked.connect(self.start_cloning)
+        self.btn_generate.clicked.connect(self._on_generate_clicked)
         layout.addWidget(self.btn_generate)
 
         # Activity indicator
@@ -304,12 +271,12 @@ class VoiceCloningApp(QMainWindow):
 
         self.btn_play = StyledButton("Play", variant="secondary")
         self.btn_play.setAccessibleName("Play audio")
-        self.btn_play.clicked.connect(self.play_audio)
+        self.btn_play.clicked.connect(self._on_play_clicked)
         self.btn_play.hide()
 
         self.btn_save = StyledButton("Save Audio", variant="secondary")
         self.btn_save.setAccessibleName("Save audio")
-        self.btn_save.clicked.connect(self.save_audio)
+        self.btn_save.clicked.connect(self._on_save_clicked)
         self.btn_save.hide()
 
         result_layout.addWidget(self.btn_play)
@@ -319,9 +286,12 @@ class VoiceCloningApp(QMainWindow):
 
         layout.addStretch()
 
+    # ------------------------------------------------------------------ #
+    # Engine management
+    # ------------------------------------------------------------------ #
+
     def _populate_engine_list(self):
         """Populate the engine combo box from factory."""
-        # Get all registered engines (not just available ones, for visibility)
         for engine_name in TTSFactory.available_engines():
             try:
                 metadata = TTSFactory.get_engine_metadata(engine_name)
@@ -335,29 +305,24 @@ class VoiceCloningApp(QMainWindow):
         try:
             return TTSFactory.get_default_engine()
         except RuntimeError:
-            # Fallback to first available if no engines available
             available = TTSFactory.available_engines()
             return available[0] if available else "coqui"
 
     def _update_engine_controls(self, engine_name: str):
         """Update the engine-specific control widgets."""
-        # Remove existing controls
         if self.engine_controls:
             self.controls_container.removeWidget(self.engine_controls)
             self.engine_controls.deleteLater()
 
-        # Create new controls for selected engine
         self.engine_controls = EngineControlsFactory.create(engine_name)
         self.controls_container.addWidget(self.engine_controls)
 
-        # Update voice file visibility based on engine requirements
         try:
             metadata = TTSFactory.get_engine_metadata(engine_name)
             requires_voice = metadata.get("requires_reference_audio", True)
             self._current_engine_requires_voice = requires_voice
             self.voice_group.setVisible(requires_voice)
         except ValueError:
-            # Unknown engine, assume it needs voice file
             self._current_engine_requires_voice = True
             self.voice_group.setVisible(True)
 
@@ -365,6 +330,10 @@ class VoiceCloningApp(QMainWindow):
         """Handle engine selection change."""
         engine_name = self.engine_combo.currentData()
         self._update_engine_controls(engine_name)
+
+    # ------------------------------------------------------------------ #
+    # Voice file selection
+    # ------------------------------------------------------------------ #
 
     def select_voice_file(self):
         """Open file dialog to select voice reference file."""
@@ -377,129 +346,115 @@ class VoiceCloningApp(QMainWindow):
                 self.voice_label.setText(Path(self.voice_path).name)
                 self.voice_label.set_role("primary")
 
-    def _get_model_id_for_engine(self, engine_name: str) -> str:
-        """Get the model ID for an engine name."""
-        return self._registry.get_model_id_for_engine(engine_name)
+    # ------------------------------------------------------------------ #
+    # Clone flow delegate (for CloneFlowController)
+    # ------------------------------------------------------------------ #
 
-    def start_cloning(self):
-        """Start the voice cloning process."""
-        # Check if voice file is needed for current engine
-        if self._current_engine_requires_voice and not self.voice_path:
-            QMessageBox.warning(
-                self,
-                "Missing Voice Reference",
-                "Please select an audio file (.wav, .mp3, .ogg, .flac) as voice reference.",
-            )
-            return
+    def warning(self, title: str, message: str):
+        QMessageBox.warning(self, title, message)
 
-        text = self.text_input.toPlainText().strip()
-        if not text:
-            QMessageBox.warning(self, "Missing Text", "Please enter text to generate audio.")
-            return
+    def critical(self, title: str, message: str):
+        QMessageBox.critical(self, title, message)
 
-        # Check if a thread is already running
-        if self.clone_thread and self.clone_thread.isRunning():
-            QMessageBox.warning(self, "Generation In Progress", "Please wait for the current generation to complete.")
-            return
+    def question(self, title: str, message: str, buttons, default_button):
+        return QMessageBox.question(self, title, message, buttons, default_button)
 
-        # Check if the model is installed
-        engine_name = self.engine_combo.currentData()
-        model_id = self._get_model_id_for_engine(engine_name)
-
-        if not self._registry.is_installed(model_id):
-            reply = QMessageBox.question(
-                self,
-                "Model Not Installed",
-                f"The model '{model_id}' is not installed.\n\n"
-                "Would you like to go to the Model Manager to download it?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.Yes,
-            )
-            if reply == QMessageBox.Yes:
-                self.tab_widget.setCurrentWidget(self.model_manager)
-            return
-
-        # Disable UI during processing
+    def disable_generate(self):
         self.btn_generate.setEnabled(False)
-        self.btn_generate.setText("Generating audio...")
+
+    def enable_generate(self):
+        self.btn_generate.setEnabled(True)
+
+    def set_generate_text(self, text: str):
+        self.btn_generate.setText(text)
+
+    def hide_play_save(self):
         self.btn_play.hide()
         self.btn_save.hide()
-        self.btn_select_voice.setEnabled(False)
-        self.engine_combo.setEnabled(False)
-        self.progress_bar.show()
 
-        # Get selected engine and parameters
-        engine_name = self.engine_combo.currentData()
-        engine_params = self.engine_controls.get_parameters() if self.engine_controls else {}
-
-        # Handle voice file based on engine requirements
-        temp_voice_path = ""
-        if self._current_engine_requires_voice:
-            # Create temporary copy of voice file
-            try:
-                temp_voice = Path(tempfile.gettempdir()) / f"voice_{uuid.uuid4().hex}{Path(self.voice_path).suffix}"
-                temp_voice.write_bytes(Path(self.voice_path).read_bytes())
-                self._temp_voice_file = str(temp_voice)
-                temp_voice_path = str(temp_voice)
-            except (OSError, PermissionError, MemoryError) as e:
-                self._reset_ui_state()
-                QMessageBox.critical(self, "File Error", f"Cannot read voice file: {e}")
-                return
-        else:
-            # For preset voice engines, use a placeholder path
-            temp_voice_path = ""
-
-        # Start cloning thread
-        self.clone_thread = CloneThread(
-            text=text, voice_path=temp_voice_path, engine_name=engine_name, engine_params=engine_params
-        )
-        self.clone_thread.finished.connect(self.on_cloning_finished)
-        self.clone_thread.error_occurred.connect(self.on_cloning_error)
-        self.clone_thread.start()
-
-    def on_cloning_finished(self, output_path: str, text: str):
-        """Handle successful cloning completion."""
-        self.current_audio = output_path
-        self._reset_ui_state()
+    def show_play_save(self):
         self.btn_play.show()
         self.btn_save.show()
 
-    @Slot(str)
-    def on_cloning_error(self, message: str):
-        """Handle cloning error."""
-        self._reset_ui_state()
-        QMessageBox.critical(self, "Generation Error", f"Failed to generate audio:\n\n{message}")
+    def disable_voice_select(self):
+        self.btn_select_voice.setEnabled(False)
 
-    def _reset_ui_state(self):
-        """Reset UI to normal state after generation."""
-        self.btn_generate.setEnabled(True)
-        self.btn_generate.setText("Generate Audio")
+    def enable_voice_select(self):
         self.btn_select_voice.setEnabled(True)
+
+    def disable_engine_combo(self):
+        self.engine_combo.setEnabled(False)
+
+    def enable_engine_combo(self):
         self.engine_combo.setEnabled(True)
+
+    def show_progress(self):
+        self.progress_bar.show()
+
+    def hide_progress(self):
         self.progress_bar.hide()
 
-    def play_audio(self):
+    def get_text_input(self) -> str:
+        return self.text_input.toPlainText()
+
+    def get_voice_path(self):
+        return self.voice_path
+
+    def get_engine_name(self) -> str:
+        return self.engine_combo.currentData()
+
+    def get_engine_params(self) -> dict:
+        if self.engine_controls:
+            return self.engine_controls.get_parameters()
+        return {}
+
+    @property
+    def is_voice_required(self) -> bool:
+        return self._current_engine_requires_voice
+
+    @property
+    def is_thread_running(self) -> bool:
+        return self._clone_flow.is_running
+
+    def is_model_installed(self, model_id: str) -> bool:
+        return self._registry.is_installed(model_id)
+
+    def get_model_id_for_engine(self, engine_name: str) -> str:
+        return self._registry.get_model_id_for_engine(engine_name)
+
+    def switch_to_model_manager(self):
+        self.tab_widget.setCurrentWidget(self.model_manager)
+
+    @property
+    def current_audio(self):
+        return self._audio.current_audio
+
+    @current_audio.setter
+    def current_audio(self, value):
+        self._audio.current_audio = value
+
+    # ------------------------------------------------------------------ #
+    # Signal handlers (wire up to collaborators)
+    # ------------------------------------------------------------------ #
+
+    @Slot()
+    def _on_generate_clicked(self):
+        """Start voice cloning process."""
+        self._clone_flow.start()
+
+    @Slot()
+    def _on_play_clicked(self):
         """Play the generated audio."""
-        if not self._audio_available:
-            QMessageBox.warning(self, "Playback Unavailable", "Audio playback is not available on this system.")
-            return
-        if self.current_audio and Path(self.current_audio).exists():
-            # Stop any currently playing audio first
-            pygame.mixer.music.stop()
-            pygame.mixer.music.load(self.current_audio)
-            pygame.mixer.music.play()
+        self._audio.play(self)
 
-    def save_audio(self):
-        """Save the generated audio to a file."""
-        if self.current_audio:
-            file_path, _ = QFileDialog.getSaveFileName(
-                self, "Save Audio File", f"cloned_voice_{uuid.uuid4().hex[:8]}.wav", "Wave Files (*.wav)"
-            )
-            if file_path:
-                import shutil
+    @Slot()
+    def _on_save_clicked(self):
+        """Save the generated audio."""
+        self._audio.save(self)
 
-                shutil.copy2(self.current_audio, file_path)
-                QMessageBox.information(self, "Saved", f"Audio file saved to:\n{file_path}")
+    def get_save_filename(self, default_name: str, file_filter: str):
+        """Delegate for QFileDialog.getSaveFileName."""
+        return QFileDialog.getSaveFileName(self, "Save Audio File", default_name, file_filter)
 
 
 def main():
