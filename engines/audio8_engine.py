@@ -62,7 +62,17 @@ class Audio8Engine(TTSEngineBase):
                         engine="audio8-onnx",
                         install_command=f"python vcloner.py --download-models {self._model_id}",
                     )
-                logger.info(f"Model {self._model_id} not found; auto_download=True so backend download is allowed...")
+                # auto_download=True: attempt to download the model
+                logger.info(f"Model {self._model_id} not found; downloading via model registry...")
+                try:
+                    self._registry.download_model(self._model_id)
+                except Exception as exc:
+                    raise ModelNotInstalledError(
+                        model_id=self._model_id,
+                        engine="audio8-onnx",
+                        install_command=f"python vcloner.py --download-models {self._model_id}",
+                        details=f"Auto-download failed: {exc}",
+                    ) from exc
 
             logger.info("Loading Audio8 ONNX model...")
             try:
@@ -215,7 +225,7 @@ class Audio8Engine(TTSEngineBase):
 
         # Add text inputs
         for name in input_names:
-            if "input_ids" in name or "input" in name.lower():
+            if "input_ids" in name:
                 model_inputs[name] = inputs["input_ids"].astype(np.int64)
             elif "attention_mask" in name:
                 model_inputs[name] = inputs.get("attention_mask", np.ones_like(inputs["input_ids"])).astype(np.int64)

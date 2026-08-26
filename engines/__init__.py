@@ -6,7 +6,7 @@ _engine_classes: dict[str, type] = {}
 def __getattr__(name: str):
     if name in _engine_classes:
         return _engine_classes[name]
-        module_map = {
+    module_map = {
         "CoquiEngine": ".coqui_engine",
         "ChatterboxEngine": ".chatterbox_engine",
         "Audio8Engine": ".audio8_engine",
