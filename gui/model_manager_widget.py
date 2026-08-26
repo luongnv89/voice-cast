@@ -4,6 +4,8 @@ GUI widget for managing TTS models.
 Provides model browsing, download, and status management.
 """
 
+import logging
+
 from PySide6.QtCore import QThread, Signal, Slot
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
@@ -32,9 +34,45 @@ from gui.theme import (
 from models import DownloadProgress, ModelDownloader, ModelRegistry
 from models.model_info import ModelInfo
 
+logger = logging.getLogger("voice_cloner.gui.model_manager")
+
+# Upper bound for how long app close waits on an active download thread.
+DEFAULT_SHUTDOWN_TIMEOUT_MS = 5000
+
 
 class CancelledError(Exception):
     """Raised when a download is cancelled by the user."""
+
+
+class _ThreadProgressReporter:
+    """Adapter emitting download signals from the worker thread.
+
+    Implements the ``ProgressReporter`` protocol; ``report`` doubles as the
+    cancellation seam — raising :class:`CancelledError` mid-transfer when an
+    interruption has been requested.
+    """
+
+    def __init__(self, thread: "ModelDownloadThread"):
+        self._thread = thread
+
+    def report(self, progress: DownloadProgress) -> None:
+        thread = self._thread
+        if thread.isInterruptionRequested():
+            raise CancelledError()
+        thread.progress_updated.emit(
+            progress.model_id or thread.model_id,
+            progress.downloaded_bytes,
+            progress.total_bytes,
+            progress.speed_bytes_per_sec,
+        )
+
+    def complete(self, model_id: str) -> None:
+        if not self._thread.isInterruptionRequested():
+            self._thread.download_complete.emit(model_id)
+
+    def error(self, model_id: str, message: str) -> None:
+        if not self._thread.isInterruptionRequested():
+            self._thread.download_error.emit(model_id, message)
 
 
 class ModelDownloadThread(QThread):
@@ -50,26 +88,14 @@ class ModelDownloadThread(QThread):
         self._downloader = ModelDownloader()
 
     def run(self):
+        reporter = _ThreadProgressReporter(self)
         try:
-
-            def progress_callback(progress: DownloadProgress):
-                if self.isInterruptionRequested():
-                    raise CancelledError()
-                self.progress_updated.emit(
-                    progress.model_id or self.model_id,
-                    progress.downloaded_bytes,
-                    progress.total_bytes,
-                    progress.speed_bytes_per_sec,
-                )
-
-            self._downloader.download(self.model_id, progress_callback=progress_callback)
-            if not self.isInterruptionRequested():
-                self.download_complete.emit(self.model_id)
+            self._downloader.download(self.model_id, progress_callback=reporter.report)
+            reporter.complete(self.model_id)
         except CancelledError:
             pass
         except Exception as e:
-            if not self.isInterruptionRequested():
-                self.download_error.emit(self.model_id, str(e))
+            reporter.error(self.model_id, str(e))
 
 
 class ModelCard(StyledCard):
@@ -440,15 +466,25 @@ class ModelManagerWidget(QWidget):
 
         self._download_threads.pop(model_id, None)
 
-    def shutdown_downloads(self):
-        """Stop active download threads before the widget is destroyed."""
+    def shutdown_downloads(self, timeout_ms: int = DEFAULT_SHUTDOWN_TIMEOUT_MS):
+        """Stop active download threads, waiting at most ``timeout_ms`` each.
+
+        The wait is bounded so closing the app never hangs on a stuck
+        transfer; threads that ignore interruption within the budget are
+        abandoned (and logged) instead of blocking shutdown forever.
+        """
         self._shutting_down = True
-        for thread in list(self._download_threads.values()):
+        threads = list(self._download_threads.values())
+        for thread in threads:
             if thread.isRunning():
                 thread.requestInterruption()
-        for thread in list(self._download_threads.values()):
-            if thread.isRunning():
-                thread.wait()
+        for thread in threads:
+            if thread.isRunning() and not thread.wait(timeout_ms):
+                logger.warning(
+                    "Download thread for '%s' ignored shutdown for %d ms; abandoning it",
+                    getattr(thread, "model_id", "<unknown>"),
+                    timeout_ms,
+                )
         self._download_threads.clear()
 
     def closeEvent(self, event: QCloseEvent):

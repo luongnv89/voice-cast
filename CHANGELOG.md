@@ -4,6 +4,14 @@
 
 ### Fixed
 
+- Model downloads now stream progress through the previously unwired callback
+  wrappers (`HuggingFaceProgressCallback`, `CoquiProgressCallback`) instead of
+  jumping 0→100%: Chatterbox and MLX forward `snapshot_download` bar updates
+  via a `tqdm_class` bridge, Coqui streams TTS's own transfer bars into a
+  reporthook adapter, so cancellation (`isInterruptionRequested()`) is now
+  reachable mid-transfer; closing the app waits on active download threads for
+  at most 5 s per thread instead of an unbounded join (#57)
+
 - The model registry's Coqui cache dir is now derived from the Coqui backend's
   own default (`TTS.utils.generic_utils.get_user_data_dir("tts")`, TTS 0.22.0)
   instead of hardcoding `~/.local/share` on Linux, so `TTS_HOME` and
