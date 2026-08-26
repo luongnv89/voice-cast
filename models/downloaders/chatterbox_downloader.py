@@ -4,7 +4,12 @@ import logging
 import time
 from pathlib import Path
 
-from models.download_progress import DownloadProgress, ProgressCallback
+from models.download_progress import (
+    DownloadProgress,
+    HuggingFaceProgressCallback,
+    ProgressCallback,
+    make_hf_tqdm_class,
+)
 from models.downloaders.base import BaseDownloader
 from models.model_registry import get_registry
 
@@ -63,12 +68,19 @@ class ChatterboxDownloader(BaseDownloader):
             # Use huggingface_hub for downloading with progress
             from huggingface_hub import snapshot_download
 
+            download_kwargs: dict = {
+                "repo_id": repo_id,
+                "revision": self.MODEL_REVISIONS[model_id],
+                "cache_dir": str(get_registry().get_cache_dir("chatterbox")),
+            }
+            if progress_callback:
+                hf_cb = HuggingFaceProgressCallback(model_id, total_size, progress_callback, start_time)
+                tqdm_class = make_hf_tqdm_class(hf_cb)
+                if tqdm_class is not None:
+                    download_kwargs["tqdm_class"] = tqdm_class
+
             # Download the model into the same cache location the registry checks.
-            cache_dir = snapshot_download(
-                repo_id=repo_id,
-                revision=self.MODEL_REVISIONS[model_id],
-                cache_dir=str(get_registry().get_cache_dir("chatterbox")),
-            )
+            cache_dir = snapshot_download(**download_kwargs)
 
             # Calculate final progress
             elapsed = time.time() - start_time
@@ -142,45 +154,3 @@ class ChatterboxDownloader(BaseDownloader):
     def get_model_size(self, model_id: str) -> int:
         """Get approximate model size in bytes."""
         return self.MODEL_SIZES.get(model_id, 0)
-
-
-class HuggingFaceProgressCallback:
-    """Progress callback wrapper for HuggingFace downloads."""
-
-    def __init__(
-        self,
-        model_id: str,
-        total_size: int,
-        callback: ProgressCallback,
-        start_time: float,
-    ):
-        self.model_id = model_id
-        self.total_size = total_size
-        self.callback = callback
-        self.start_time = start_time
-        self.last_update = 0
-
-    def __call__(self, current: int, total: int):
-        """Called during download."""
-        # Throttle updates
-        current_time = time.time()
-        if current_time - self.last_update < 0.1 and current < total:
-            return
-        self.last_update = current_time
-
-        actual_total = total if total > 0 else self.total_size
-        elapsed = current_time - self.start_time
-        speed = current / elapsed if elapsed > 0 else 0
-        remaining = actual_total - current
-        eta = remaining / speed if speed > 0 else -1
-
-        self.callback(
-            DownloadProgress(
-                downloaded_bytes=current,
-                total_bytes=actual_total,
-                speed_bytes_per_sec=speed,
-                eta_seconds=eta,
-                model_id=self.model_id,
-                status="downloading",
-            )
-        )

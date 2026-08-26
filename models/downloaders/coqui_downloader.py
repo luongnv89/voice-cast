@@ -1,6 +1,7 @@
 """Coqui TTS model downloader with progress reporting."""
 
 import logging
+import threading
 import time
 from pathlib import Path
 
@@ -9,6 +10,63 @@ from models.downloaders.base import BaseDownloader
 from models.model_registry import get_registry
 
 logger = logging.getLogger("voice_cloner.models.coqui")
+
+# TTS manage.py streams files in 1 KiB chunks (iter_content(1024)); its
+# module-global ``tqdm`` is the only injection point for transfer progress.
+_TQDM_BLOCK_SIZE = 1024
+_TQDM_PATCH_LOCK = threading.Lock()
+
+
+def _make_forwarding_tqdm(base_tqdm, reporthook):
+    """Wrap TTS's tqdm so bar updates feed a urllib-style reporthook."""
+
+    class _ForwardingTqdm(base_tqdm):
+        def update(self, n=1):
+            shown = super().update(n)
+            total = int(self.total) if self.total else 0
+            reporthook(int(self.n) // _TQDM_BLOCK_SIZE, _TQDM_BLOCK_SIZE, total)
+            return shown
+
+    return _ForwardingTqdm
+
+
+def _download_model_with_progress(
+    model_name: str, cache_dir: Path, total_size: int, model_id: str, progress_callback: ProgressCallback
+) -> tuple:
+    """Run ModelManager.download_model, streaming progress when possible.
+
+    Patches the ``tqdm`` symbol inside ``TTS.utils.manage`` for the duration
+    of the call (restored in ``finally``) and constructs the manager with
+    ``progress_bar=True`` so upstream reports each chunk through it. Falls
+    back to a plain call when no callback is given or the seam is unusable.
+    """
+    from TTS.utils import manage as tts_manage
+    from TTS.utils.manage import ModelManager
+
+    def build_manager(progress_bar):
+        try:
+            return ModelManager(output_prefix=str(cache_dir), progress_bar=progress_bar)
+        except TypeError:
+            try:
+                return ModelManager(output_prefix=str(cache_dir))
+            except TypeError:
+                return ModelManager()
+
+    base_tqdm = getattr(tts_manage, "tqdm", None)
+    if progress_callback is None or not isinstance(base_tqdm, type):
+        manager = build_manager(False)
+        return manager.download_model(model_name)
+
+    coqui_cb = CoquiProgressCallback(model_id, total_size, progress_callback)
+    forwarding = _make_forwarding_tqdm(base_tqdm, coqui_cb)
+    with _TQDM_PATCH_LOCK:
+        original = tts_manage.tqdm
+        tts_manage.tqdm = forwarding
+        try:
+            manager = build_manager(True)
+            return manager.download_model(model_name)
+        finally:
+            tts_manage.tqdm = original
 
 
 class CoquiDownloader(BaseDownloader):
@@ -52,19 +110,14 @@ class CoquiDownloader(BaseDownloader):
         start_time = time.time()
 
         try:
-            # Import TTS here to avoid import errors if not installed
-            from TTS.utils.manage import ModelManager
-
-            # Get the model manager to access download functionality. Use the
-            # same provider-native cache root the registry checks.
+            # Import TTS lazily; a missing package surfaces as ImportError
+            # and is reported with install guidance by the handler below.
+            # Use the same provider-native cache root the registry checks.
             cache_dir = get_registry().get_cache_dir("coqui")
-            try:
-                manager = ModelManager(output_prefix=str(cache_dir))
-            except TypeError:
-                manager = ModelManager()
 
-            # Check if model needs downloading
-            model_path, config_path, model_item = manager.download_model(model_name)
+            model_path, _config_path, _model_item = _download_model_with_progress(
+                model_name, cache_dir, total_size, model_id, progress_callback
+            )
 
             # Calculate final progress
             elapsed = time.time() - start_time

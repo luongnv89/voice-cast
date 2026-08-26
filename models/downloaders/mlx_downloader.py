@@ -4,7 +4,12 @@ import logging
 import time
 from pathlib import Path
 
-from models.download_progress import DownloadProgress, ProgressCallback
+from models.download_progress import (
+    DownloadProgress,
+    HuggingFaceProgressCallback,
+    ProgressCallback,
+    make_hf_tqdm_class,
+)
 from models.downloaders.base import BaseDownloader
 from models.model_registry import get_registry
 
@@ -58,7 +63,18 @@ class MlxDownloader(BaseDownloader):
         try:
             from huggingface_hub import snapshot_download
 
-            path = snapshot_download(repo_id=repo_id, revision=self.MODEL_REVISIONS[model_id], cache_dir=str(cache_dir))
+            download_kwargs: dict = {
+                "repo_id": repo_id,
+                "revision": self.MODEL_REVISIONS[model_id],
+                "cache_dir": str(cache_dir),
+            }
+            if progress_callback:
+                hf_cb = HuggingFaceProgressCallback(model_id, total_size, progress_callback, start_time)
+                tqdm_class = make_hf_tqdm_class(hf_cb)
+                if tqdm_class is not None:
+                    download_kwargs["tqdm_class"] = tqdm_class
+
+            path = snapshot_download(**download_kwargs)
         except ImportError as e:
             logger.error("huggingface_hub package not installed. Install with: pip install huggingface_hub")
             raise ImportError("huggingface_hub package required. Install with: pip install huggingface_hub") from e
