@@ -248,7 +248,7 @@ voicecast/
 ├── tts_factory.py           # Engine factory
 ├── vcloner.py               # CLI tool
 ├── voice_cloning_app.py     # GUI application
-├── main.py                  # Example usage script
+├── voice_cloning_app.py    # Main application entry point
 ├── engines/
 │   ├── __init__.py
 │   ├── coqui_engine.py      # Coqui XTTS v2 engine
