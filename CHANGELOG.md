@@ -6,9 +6,18 @@
 
 - Added `docs/agent-environment.md` with agent-facing setup and run notes (#46)
 - Added `CLAUDE.md` and `AGENTS.md` at the repo root pointing to the environment notes (#47, #48)
+- Documented the proven lockfile bootstrap (fresh venv → install → suite) with
+  discovered gotchas: interpreter pinning, CUDA torch wheel size, `--extra dev`
+  regeneration, and headless Qt (#50)
 
 ### Infrastructure
 
+- Extended the pinned `requirements.txt` to cover the `dev` extra (`pytest`,
+  `pytest-cov`, `ruff`, `bandit` + transitives) so a fresh
+  `pip install -r requirements.txt -e .` yields a complete test environment;
+  all existing pins unchanged (#50)
+- Added `tests/conftest.py` defaulting `QT_QPA_PLATFORM=offscreen` so Qt
+  widget tests can run on headless machines where PySide6 is installed (#50)
 - Added fully pinned `requirements.txt` (universal uv lock of `pyproject.toml`
   runtime deps) so the CI security job's `safety check` and the pre-commit
   safety hook resolve; documented regeneration in `docs/agent-environment.md`

@@ -41,6 +41,44 @@ The test suite mocks heavyweight modules (`torch`, `torchaudio`, `TTS`,
 `sys.modules` stubs at the top of `tests/test_voice_cloner.py`. You do not need
 the ML stack to run tests.
 
+### Bootstrapping from the lockfile (proven)
+
+The lockfile pins runtime **and dev** tooling (`pytest`, `pytest-cov`, `ruff`,
+`bandit`, `pre-commit`), so one install gives you everything the commands of
+record below need. Verified end-to-end on a clean venv (Python 3.11, Linux
+x86_64): `pip install -r requirements.txt -e . && pytest tests/ -v --tb=short`
+→ 106 passed.
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt -e .
+pytest tests/ -v --tb=short
+```
+
+Gotchas discovered during that verification:
+
+- **Pin the interpreter to 3.10–3.12 explicitly.** Dev-machine defaults can be
+  Python 3.14 (untested); the lockfile resolves its `< '3.13'` branch only on
+  older interpreters. Use `python3.11`/`python3.12`, not bare `python3`.
+- **Linux x86_64 pulls CUDA torch wheels.** The pinned `torch==2.6.0` brings
+  the NVIDIA CUDA-12 dependency stack (~2.5 GB download, ~8 GB installed). CI
+  dodges this with the minimal `--no-deps` install above; local full installs
+  should just expect the size (or pre-seed a CPU-only torch wheel).
+- **Regenerate with `--extra dev`, never `--all-extras`.**
+  `uv pip compile pyproject.toml --universal --extra dev -o requirements.txt`
+  works; `--all-extras` cannot produce a universal solution because the
+  darwin-only `mlx` extra conflicts with `chatterbox-tts`' per-Python
+  `transformers` pins on the Python ≥ 3.13 split. The dev extra caps
+  `ruff < 0.9` on purpose — that is the range the CI lint job uses, so the
+  locked formatter never disagrees with CI.
+- **Headless Qt needs the offscreen platform.** PySide6 ships in the lock, so
+  the engine-control widget tests actually execute locally (20 tests that CI
+  skips via `pytest.importorskip("PySide6")` because its minimal install never
+  installs PySide6). Without a display server, creating a `QApplication`
+  aborts the process; `tests/conftest.py` sets `QT_QPA_PLATFORM=offscreen`
+  unless you override it.
+
 ## System prerequisites
 
 | Package | Why | Install (Debian/Ubuntu) |
@@ -105,13 +143,14 @@ and security jobs.
 
 ## Known gaps
 
-- **Lockfile covers runtime deps only, and is not used for installs.**
-  `requirements.txt` is a fully pinned universal lock generated from
-  `pyproject.toml` (`uv pip compile pyproject.toml --universal -o
-  requirements.txt`). It exists so the CI *security* job and the pre-commit
-  safety hook can scan real pins; CI/local installs still resolve loose
-  ranges from `pyproject.toml`, so regenerate the lock whenever those
-  dependencies change (`tests/test_requirements_lock.py` enforces sync).
+- **The CI *test* job does not install from the lockfile** — it uses the
+  minimal `--no-deps` install above, so heavyweight engines stay unexercised
+  there and PySide6-dependent tests skip. Full-lock local environments are the
+  ones that exercise them (see the bootstrap section above).
+- `requirements.txt` remains the fully pinned universal lock of
+  `pyproject.toml` (+ the `dev` extra), consumed by the CI *security* job and
+  the pre-commit safety hook. Regenerate it whenever dependencies change
+  (`tests/test_requirements_lock.py` enforces sync).
 
 ## See also
 
