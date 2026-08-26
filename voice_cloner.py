@@ -144,7 +144,6 @@ class VoiceCloner:
         play_audio: bool = True,
         save_audio: bool = False,
         output_file: str | None = None,
-        speed: float = 1.0,
         **kwargs,
     ):
         """
@@ -156,7 +155,6 @@ class VoiceCloner:
             play_audio: Whether to play the audio.
             save_audio: Whether to save to file.
             output_file: Output file path (auto-generated if not provided).
-            speed: Playback speed multiplier.
             **kwargs: Engine-specific parameters (e.g., cfg_weight for Chatterbox).
         """
         logger.info(f"Generating speech for: '{text_to_voice[:50]}...' [{language}]")
@@ -182,24 +180,22 @@ class VoiceCloner:
 
                 # Play if requested
                 if play_audio:
-                    self._play_audio(audio_data, sample_rate, speed)
+                    self._play_audio(audio_data, sample_rate)
 
             except Exception as e:
                 logger.error(f"Error during TTS generation: {e}")
                 raise
 
-    def _play_audio(self, audio_data, sample_rate: int, speed: float = 1.0):
+    def _play_audio(self, audio_data, sample_rate: int):
         """
         Play the generated audio.
 
         Args:
             audio_data: Audio samples as numpy array.
             sample_rate: Audio sample rate.
-            speed: Playback speed multiplier.
         """
         try:
-            adjusted_sample_rate = int(sample_rate * speed)
-            sd.play(audio_data, adjusted_sample_rate)
+            sd.play(audio_data, sample_rate)
             sd.wait()
             logger.info("Audio playback finished.")
         except Exception as e:
