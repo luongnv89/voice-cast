@@ -164,6 +164,16 @@ class CloneFlowController:
         """Whether a generation is currently in progress."""
         return self._thread is not None and self._thread.isRunning()
 
+    def terminate(self):
+        """Terminate the generation thread if running.
+
+        Blocks until the thread has finished terminating.
+        """
+        if self._thread is not None and self._thread.isRunning():
+            self._thread.terminate()
+            self._thread.wait(5000)  # Wait up to 5 seconds
+            self._thread = None
+
     def start(self) -> bool:
         """Start the voice cloning process.
 
