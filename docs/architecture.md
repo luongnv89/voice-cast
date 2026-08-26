@@ -276,6 +276,7 @@ voicecast/
 ```python
 from tts_engine_base import TTSEngineBase
 
+
 class MyEngine(TTSEngineBase):
     def generate(self, text, language="en", **kwargs):
         # Implementation
@@ -298,11 +299,7 @@ class MyEngine(TTSEngineBase):
 ```python
 from engines.my_engine import MyEngine
 
-TTSFactory.register(
-    name="my-engine",
-    engine_class=MyEngine,
-    display_name="My Custom Engine"
-)
+TTSFactory.register(name="my-engine", engine_class=MyEngine, display_name="My Custom Engine")
 ```
 
 3. Add GUI controls in `gui/engine_controls.py` if needed.

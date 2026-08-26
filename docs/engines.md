@@ -67,20 +67,13 @@ Coqui XTTS v2 is a multilingual TTS model that excels at voice cloning across 16
 from voice_cloner import VoiceCloner
 
 # Using constructor
-cloner = VoiceCloner(
-    speaker_wav="./speaker.wav",
-    engine="coqui"
-)
+cloner = VoiceCloner(speaker_wav="./speaker.wav", engine="coqui")
 
 # Or factory method
 cloner = VoiceCloner.from_coqui(speaker_wav="./speaker.wav")
 
 # Generate in French
-cloner.say(
-    "Bonjour, comment allez-vous?",
-    language="fr",
-    temperature=0.7
-)
+cloner.say("Bonjour, comment allez-vous?", language="fr", temperature=0.7)
 ```
 
 ### Best Practices
@@ -149,17 +142,10 @@ Controls emotional intensity:
 ```python
 from voice_cloner import VoiceCloner
 
-cloner = VoiceCloner.from_chatterbox(
-    speaker_wav="./speaker.wav",
-    variant="turbo"
-)
+cloner = VoiceCloner.from_chatterbox(speaker_wav="./speaker.wav", variant="turbo")
 
 # Expressive speech with tags
-cloner.say(
-    "Oh no [gasp]! That's terrible [sigh]...",
-    cfg_weight=0.3,
-    exaggeration=0.7
-)
+cloner.say("Oh no [gasp]! That's terrible [sigh]...", cfg_weight=0.3, exaggeration=0.7)
 ```
 
 ### Best Practices
@@ -193,16 +179,9 @@ Same as Turbo:
 ```python
 from voice_cloner import VoiceCloner
 
-cloner = VoiceCloner.from_chatterbox(
-    speaker_wav="./speaker.wav",
-    variant="standard"
-)
+cloner = VoiceCloner.from_chatterbox(speaker_wav="./speaker.wav", variant="standard")
 
-cloner.say(
-    "This is high-quality production audio.",
-    cfg_weight=0.5,
-    exaggeration=0.5
-)
+cloner.say("This is high-quality production audio.", cfg_weight=0.5, exaggeration=0.5)
 ```
 
 ### Best Practices

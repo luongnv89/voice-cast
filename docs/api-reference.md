@@ -46,16 +46,10 @@ VoiceCloner(
 cloner = VoiceCloner(speaker_wav="./voice-samples/speaker.wav")
 
 # Using Chatterbox Turbo
-cloner = VoiceCloner(
-    speaker_wav="./voice-samples/speaker.wav",
-    engine="chatterbox-turbo"
-)
+cloner = VoiceCloner(speaker_wav="./voice-samples/speaker.wav", engine="chatterbox-turbo")
 
 # Force CPU usage
-cloner = VoiceCloner(
-    speaker_wav="./voice-samples/speaker.wav",
-    device="cpu"
-)
+cloner = VoiceCloner(speaker_wav="./voice-samples/speaker.wav", device="cpu")
 ```
 
 **Model download behavior:** VoiceCast does not download model files during normal initialization or generation. Use `VoiceCloner.download_model()` or `python vcloner.py --download-models <model-id>` first. Missing models raise `ModelNotInstalledError`.
@@ -94,10 +88,7 @@ Create a VoiceCloner with Coqui TTS engine.
 **Example:**
 
 ```python
-cloner = VoiceCloner.from_coqui(
-    speaker_wav="./voice-samples/speaker.wav",
-    device="cuda"
-)
+cloner = VoiceCloner.from_coqui(speaker_wav="./voice-samples/speaker.wav", device="cuda")
 ```
 
 ---
@@ -127,16 +118,10 @@ Create a VoiceCloner with Chatterbox TTS engine.
 
 ```python
 # Fast Turbo variant
-cloner = VoiceCloner.from_chatterbox(
-    speaker_wav="./voice-samples/speaker.wav",
-    variant="turbo"
-)
+cloner = VoiceCloner.from_chatterbox(speaker_wav="./voice-samples/speaker.wav", variant="turbo")
 
 # Higher quality Standard variant
-cloner = VoiceCloner.from_chatterbox(
-    speaker_wav="./voice-samples/speaker.wav",
-    variant="standard"
-)
+cloner = VoiceCloner.from_chatterbox(speaker_wav="./voice-samples/speaker.wav", variant="standard")
 ```
 
 ---
@@ -188,33 +173,16 @@ Convert text to speech using the configured engine.
 cloner.say("Hello world!")
 
 # Save to file
-cloner.say(
-    "This is a test.",
-    save_audio=True,
-    output_file="output.wav"
-)
+cloner.say("This is a test.", save_audio=True, output_file="output.wav")
 
 # Play at 1.5x speed without saving
-cloner.say(
-    "Speed up the playback.",
-    speed=1.5,
-    play_audio=True,
-    save_audio=False
-)
+cloner.say("Speed up the playback.", speed=1.5, play_audio=True, save_audio=False)
 
 # French with Coqui engine
-cloner.say(
-    "Bonjour le monde!",
-    language="fr",
-    temperature=0.8
-)
+cloner.say("Bonjour le monde!", language="fr", temperature=0.8)
 
 # Chatterbox with paralinguistic tag
-chatter_cloner.say(
-    "That's hilarious [laugh]!",
-    cfg_weight=0.3,
-    exaggeration=0.7
-)
+chatter_cloner.say("That's hilarious [laugh]!", cfg_weight=0.3, exaggeration=0.7)
 ```
 
 ---
@@ -388,11 +356,7 @@ Create an engine instance directly.
 **Example:**
 
 ```python
-engine = TTSFactory.create(
-    engine_name="chatterbox-turbo",
-    speaker_wav="./speaker.wav",
-    device="cuda"
-)
+engine = TTSFactory.create(engine_name="chatterbox-turbo", speaker_wav="./speaker.wav", device="cuda")
 ```
 
 ---
@@ -442,22 +406,20 @@ from tts_engine_base import TTSEngineBase
 
 ```python
 @abstractmethod
-def generate(
-    self,
-    text: str,
-    language: str = "en",
-    **kwargs
-) -> tuple[np.ndarray, int]:
+def generate(self, text: str, language: str = "en", **kwargs) -> tuple[np.ndarray, int]:
     """Generate audio from text. Returns (audio_data, sample_rate)."""
+
 
 @abstractmethod
 def get_supported_parameters(self) -> dict[str, dict]:
     """Return supported parameters with metadata."""
 
+
 @property
 @abstractmethod
 def name(self) -> str:
     """Human-readable engine name."""
+
 
 @property
 @abstractmethod
@@ -471,6 +433,7 @@ def supports_languages(self) -> list[str]:
 import numpy as np
 from tts_engine_base import TTSEngineBase
 
+
 class MyCustomEngine(TTSEngineBase):
     def generate(self, text, language="en", my_param=0.5, **kwargs):
         # Your TTS implementation
@@ -480,13 +443,7 @@ class MyCustomEngine(TTSEngineBase):
 
     def get_supported_parameters(self):
         return {
-            "my_param": {
-                "type": float,
-                "default": 0.5,
-                "description": "My custom parameter",
-                "min": 0.0,
-                "max": 1.0
-            }
+            "my_param": {"type": float, "default": 0.5, "description": "My custom parameter", "min": 0.0, "max": 1.0}
         }
 
     @property
@@ -497,13 +454,11 @@ class MyCustomEngine(TTSEngineBase):
     def supports_languages(self):
         return ["en"]
 
+
 # Register the engine
 from tts_factory import TTSFactory
-TTSFactory.register(
-    name="my-engine",
-    engine_class=MyCustomEngine,
-    display_name="My Custom Engine"
-)
+
+TTSFactory.register(name="my-engine", engine_class=MyCustomEngine, display_name="My Custom Engine")
 
 # Use it
 cloner = VoiceCloner(speaker_wav="./speaker.wav", engine="my-engine")
@@ -532,20 +487,11 @@ from voice_cloner import VoiceCloner
 
 cloner = VoiceCloner(speaker_wav="./voice-samples/speaker.wav")
 
-texts = [
-    "First sentence to convert.",
-    "Second sentence to convert.",
-    "Third sentence to convert."
-]
+texts = ["First sentence to convert.", "Second sentence to convert.", "Third sentence to convert."]
 
 for i, text in enumerate(texts):
-    cloner.say(
-        text,
-        play_audio=False,
-        save_audio=True,
-        output_file=f"output_{i+1}.wav"
-    )
-    print(f"Generated: output_{i+1}.wav")
+    cloner.say(text, play_audio=False, save_audio=True, output_file=f"output_{i + 1}.wav")
+    print(f"Generated: output_{i + 1}.wav")
 ```
 
 ### Multilingual with Coqui
@@ -573,23 +519,12 @@ cloner.say("Hallo, wie geht es Ihnen?", language="de")
 ```python
 from voice_cloner import VoiceCloner
 
-cloner = VoiceCloner.from_chatterbox(
-    speaker_wav="./speaker.wav",
-    variant="turbo"
-)
+cloner = VoiceCloner.from_chatterbox(speaker_wav="./speaker.wav", variant="turbo")
 
 # Use paralinguistic tags for expression
-cloner.say(
-    "That's the funniest thing I've ever heard [laugh]!",
-    cfg_weight=0.3,
-    exaggeration=0.8
-)
+cloner.say("That's the funniest thing I've ever heard [laugh]!", cfg_weight=0.3, exaggeration=0.8)
 
-cloner.say(
-    "I'm so exhausted [sigh]... it's been a long day.",
-    cfg_weight=0.5,
-    exaggeration=0.6
-)
+cloner.say("I'm so exhausted [sigh]... it's been a long day.", cfg_weight=0.5, exaggeration=0.6)
 ```
 
 ### Engine Comparison

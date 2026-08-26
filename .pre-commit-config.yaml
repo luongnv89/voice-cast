@@ -22,7 +22,7 @@ repos:
 
   # Ruff - Fast Python linter and formatter
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.4
+    rev: v0.16.4
     hooks:
       # Linter
       - id: ruff
@@ -41,12 +41,18 @@ repos:
         additional_dependencies: ["bandit[toml]"]
         exclude: ^tests/
 
-  # Check for common security issues in dependencies
-  - repo: https://github.com/Lucas-C/pre-commit-hooks-safety
-    rev: v1.3.3
+  # Dependency vulnerability audit against the pinned lockfile (pip-audit
+  # replaces the unmaintained safety hook; any advisory outside the documented
+  # baseline fails the hook). Requires network access to advisory databases.
+  - repo: local
     hooks:
-      - id: python-safety-dependencies-check
-        files: requirements\.txt$
+      - id: pip-audit-lockfile
+        name: pip-audit dependency vulnerability audit
+        entry: scripts/pip_audit_lockfile.sh
+        language: python
+        additional_dependencies: ["pip-audit>=2.9.0"]
+        files: ^requirements\.txt$
+        pass_filenames: false
 
 # CI configuration
 ci:
@@ -54,4 +60,3 @@ ci:
   autofix_prs: true
   autoupdate_commit_msg: 'chore: update pre-commit hooks'
   autoupdate_schedule: monthly
-  skip: [python-safety-dependencies-check]  # Skip in CI as it requires special setup
