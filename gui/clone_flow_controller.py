@@ -7,10 +7,10 @@ Extracts the voice cloning generation flow from the main application window:
   multi-GB model weights on every generation.
 """
 
+import contextlib
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Any
 
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import QMessageBox
@@ -55,7 +55,8 @@ class VoiceClonerCache:
             return
 
         keys_to_remove = [
-            key for key in self._cache
+            key
+            for key in self._cache
             if (engine_name is not None and key[0] == engine_name)
             or (speaker_wav is not None and key[1] == speaker_wav)
         ]
@@ -101,9 +102,7 @@ class CloneThread(QThread):
             # Use cached cloner or create a new one
             voice_cloner = self._voice_cloner
             if voice_cloner is None:
-                voice_cloner = VoiceCloner(
-                    speaker_wav=self.voice_path, engine=self.engine_name
-                )
+                voice_cloner = VoiceCloner(speaker_wav=self.voice_path, engine=self.engine_name)
 
             # Generate audio
             voice_cloner.say(
@@ -275,10 +274,8 @@ class CloneFlowController:
     def _cleanup_temp(self):
         """Clean up temporary voice file."""
         if self._temp_voice_file:
-            try:
+            with contextlib.suppress(OSError):
                 Path(self._temp_voice_file).unlink(missing_ok=True)
-            except OSError:
-                pass
             self._temp_voice_file = None
 
     def engine_changed(self, engine_name: str):
