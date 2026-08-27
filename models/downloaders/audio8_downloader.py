@@ -20,11 +20,11 @@ class Audio8Downloader(BaseDownloader):
     """Downloader for Audio8 TTS ONNX model from Hugging Face."""
 
     MODEL_REPOS = {
-        "audio8-tts": "audio8/audio8-TTS-0-1B-ONNX-INT8",
+        "audio8-tts": "Audio8/audio8-TTS-0.1B-ONNX-INT8",
     }
 
     MODEL_REVISIONS = {
-        "audio8-tts": None,  # Use latest
+        "audio8-tts": "e1c07e8a3725077e3ab80ad8578e5787e8a23c6c",
     }
 
     MODEL_SIZES = {
@@ -69,6 +69,7 @@ class Audio8Downloader(BaseDownloader):
 
             path = snapshot_download(
                 repo_id=repo_id,
+                revision=self.MODEL_REVISIONS[model_id],
                 cache_dir=str(cache_dir),
                 **extra_kwargs,
             )

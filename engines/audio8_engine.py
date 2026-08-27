@@ -5,6 +5,7 @@ Supports the audio8-TTS-0-1B-ONNX-INT8 model for high-quality voice cloning.
 
 import logging
 import os
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -65,7 +66,9 @@ class Audio8Engine(TTSEngineBase):
                 # auto_download=True: attempt to download the model
                 logger.info(f"Model {self._model_id} not found; downloading via model registry...")
                 try:
-                    self._registry.download_model(self._model_id)
+                    from models.model_downloader import ModelDownloader
+
+                    ModelDownloader(registry=self._registry).download(self._model_id)
                 except Exception as exc:
                     raise ModelNotInstalledError(
                         model_id=self._model_id,
@@ -97,10 +100,17 @@ class Audio8Engine(TTSEngineBase):
             try:
                 from transformers import AutoTokenizer
 
-                model_path = self._get_model_path()
+                _ = self._get_model_path()  # validate model is installed
+                install_path = self._registry.get_install_path(self._model_id)
                 cache_dir = self._registry.get_cache_dir("audio8-onnx")
-                self._processor = AutoTokenizer.from_pretrained(
-                    str(model_path),
+                # Tokenizer lives under tokenizer/ subfolder in the HF repo
+                tokenizer_path = (
+                    Path(install_path) / "tokenizer"
+                    if (Path(install_path) / "tokenizer").exists()
+                    else Path(install_path)
+                )
+                self._processor = AutoTokenizer.from_pretrained(  # nosec B615 - local cache path, revision pinned at download time
+                    str(tokenizer_path),
                     cache_dir=str(cache_dir),
                 )
                 logger.info("Audio8 processor loaded successfully")
@@ -120,9 +130,12 @@ class Audio8Engine(TTSEngineBase):
             )
 
         # Look for the ONNX model file in the install directory
-        for filename in os.listdir(install_path):
-            if filename.endswith(".onnx"):
-                return str(install_path / filename)
+        try:
+            for file_path in Path(install_path).iterdir():
+                if file_path.suffix == ".onnx":
+                    return str(file_path)
+        except FileNotFoundError:
+            pass
 
         raise ModelNotInstalledError(
             model_id=self._model_id,
@@ -202,7 +215,12 @@ class Audio8Engine(TTSEngineBase):
 
         # Resample to 24kHz if needed
         if sr != self._sample_rate:
-            import librosa
+            try:
+                import librosa
+            except ImportError as e:
+                raise ImportError(
+                    "librosa required for Audio8 reference audio preprocessing. Install with: pip install voicecast[audio8]"
+                ) from e
 
             audio_data = librosa.resample(audio_data, orig_sr=sr, target_sr=self._sample_rate)
 
@@ -258,7 +276,12 @@ class Audio8Engine(TTSEngineBase):
 
         # Apply speed adjustment
         if speed != 1.0:
-            import scipy.signal
+            try:
+                import scipy.signal
+            except ImportError as e:
+                raise ImportError(
+                    "scipy required for Audio8 speed adjustment. Install with: pip install voicecast[audio8]"
+                ) from e
 
             factor = 1.0 / speed
             audio_data = scipy.signal.resample(audio_data, int(len(audio_data) * factor))

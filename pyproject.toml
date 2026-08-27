@@ -26,6 +26,8 @@ mlx = [
 ]
 audio8 = [
     "onnxruntime>=1.18.0",
+    "librosa>=0.10.0",
+    "scipy>=1.11.0",
 ]
 dev = [
     "pytest>=8.0.0",

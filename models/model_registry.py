@@ -109,7 +109,7 @@ class ModelRegistry:
             name="Audio8 TTS (1B)",
             size_mb=2000,
             description="High-quality voice cloning with Audio8 ONNX model. Supports reference audio voice cloning.",
-            model_path_checker="audio8/audio8-TTS-0-1B-ONNX-INT8",
+            model_path_checker="Audio8/audio8-TTS-0.1B-ONNX-INT8",
         ),
     ]
 

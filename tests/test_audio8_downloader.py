@@ -21,7 +21,7 @@ class TestAudio8DownloaderModelInfo:
         """Test the correct HuggingFace repo ID."""
         from models.downloaders.audio8_downloader import Audio8Downloader
 
-        assert Audio8Downloader.MODEL_REPOS["audio8-tts"] == "audio8/audio8-TTS-0-1B-ONNX-INT8"
+        assert Audio8Downloader.MODEL_REPOS["audio8-tts"] == "Audio8/audio8-TTS-0.1B-ONNX-INT8"
 
     def test_model_sizes_contains_audio8_tts(self):
         """Test that MODEL_SIZES contains audio8-tts."""
@@ -93,7 +93,7 @@ class TestAudio8DownloaderDownload:
         downloader.download("audio8-tts")
 
         call_kwargs = mock_snapshot.call_args
-        assert call_kwargs.kwargs["repo_id"] == "audio8/audio8-TTS-0-1B-ONNX-INT8"
+        assert call_kwargs.kwargs["repo_id"] == "Audio8/audio8-TTS-0.1B-ONNX-INT8"
 
     @patch("huggingface_hub.snapshot_download")
     def test_download_uses_registry_cache_dir(self, mock_snapshot):
