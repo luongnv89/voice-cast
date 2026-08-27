@@ -107,7 +107,7 @@ def main():
 
     # Get available engines for help text
     available_engines = TTSFactory.available_engines()
-    model_engine_groups = ["chatterbox", "mlx-audio"]
+    model_engine_groups = ["chatterbox", "mlx-audio", "audio8"]
     engine_choices = sorted(set(available_engines + model_engine_groups))
     engines_help = ", ".join(available_engines)
 

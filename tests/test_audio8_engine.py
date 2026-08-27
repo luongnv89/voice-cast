@@ -266,3 +266,43 @@ class TestAudio8EngineDeviceProviders:
             {"onnxruntime": MagicMock(get_available_providers=lambda: ["CPUExecutionProvider"])},
         ):
             assert Audio8Engine._has_cuda_provider() is False
+
+
+class TestAudio8ProcessorPadToken:
+    """The audio8 tokenizer ships without a configured pad_token.
+
+    The engine adopts the vocab's own ``<|pad|>`` (id 0) so the
+    ``padding=True`` call in generate() does not raise. Adding a brand-new
+    token must be avoided — it would grow the vocabulary and desync the
+    ONNX input space.
+    """
+
+    @patch("engines.audio8_engine.Audio8Engine._get_model_path", return_value="/fake/model.onnx")
+    def test_processor_adopts_vocab_pad_token(self, mock_path):
+        """processor sets pad_token from existing vocab when none is wired."""
+        from engines.audio8_engine import Audio8Engine
+
+        class _BareTokenizer:
+            """Tokenizer without special-token wiring (mirrors the real model)."""
+
+            pad_token = None
+
+            def __init__(self):
+                self.converted_idx = None
+
+            def convert_ids_to_tokens(self, idx):
+                self.converted_idx = idx
+                return "<|pad|>"
+
+        registry = MagicMock()
+        registry.get_install_path.return_value = "/fake/install"
+        registry.get_cache_dir.return_value = "/fake/cache"
+        engine = Audio8Engine(speaker_wav="voice.wav", registry=registry)
+
+        from transformers import AutoTokenizer
+
+        with patch.object(AutoTokenizer, "from_pretrained", return_value=_BareTokenizer()):
+            _ = engine.processor
+
+        assert engine._processor.pad_token == "<|pad|>"
+        assert engine._processor.converted_idx == 0

@@ -24,6 +24,7 @@ not downloaded until you explicitly request them.
    python vcloner.py --download-models coqui-xtts-v2
    python vcloner.py --download-models chatterbox-turbo chatterbox-standard
    python vcloner.py --download-models --engine chatterbox
+   python vcloner.py --download-models --engine audio8
    ```
 
 4. Generate audio with an installed model:
@@ -45,6 +46,7 @@ normal generation.
 | `chatterbox-standard` | `chatterbox` | Higher-quality English voice cloning |
 | `mlx-kokoro` | `mlx-audio` | Apple Silicon preset voice TTS |
 | `mlx-csm` | `mlx-audio` | Apple Silicon voice cloning |
+| `audio8-tts` | `audio8-onnx` | CPU-first ONNX voice cloning (Audio8 0.1B) |
 
 MLX model downloads use the Hugging Face cache and require `huggingface_hub`.
 Generation still requires the optional MLX backend on Apple Silicon.

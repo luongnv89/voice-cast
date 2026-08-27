@@ -275,3 +275,25 @@ Approximate generation times on different hardware:
 - [API Reference](api-reference.md) - Detailed parameter documentation
 - [Troubleshooting](troubleshooting.md) - Common issues
 - [Architecture](architecture.md) - How engines integrate
+## Audio8 TTS (ONNX)
+
+Audio8 (`--engine audio8-onnx`, model `audio8-tts`) is a compact CPU-first
+multilingual zero-shot voice-cloning engine shipped as four ONNX sessions
+(codec encoder, slow AR, fast AR, codec decoder). It needs the `audio8`
+optional extra:
+
+```bash
+pip install -e ".[audio8]"
+python vcloner.py --download-models audio8-tts
+python vcloner.py -i voice.wav -t "Hello world" -o output.wav --engine audio8-onnx
+```
+
+- Output is 44.1 kHz mono WAV; a 5–30 second clean reference clip is
+  recommended (0.5–30 s accepted).
+- Parameters: `speed` (0.5–2.0) via the API/GUI. Advanced sampling knobs
+  (`temperature`, `top_p`, `top_k`, `seed`, `max_new_tokens`) and the
+  reference transcript (`reference_transcript`) are available through the
+  Python API via engine kwargs.
+- If the reference transcript is not supplied, the model's bundled reference
+  profile text is used so generation always works out of the box; supplying
+  the exact transcript of the reference clip improves speaker similarity.

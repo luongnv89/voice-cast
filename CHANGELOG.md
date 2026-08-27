@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Audio8: implement the real four-session ArkTTS pipeline (codec encoder,
+  slow AR, fast AR, codec decoder) with per-token KV-cache stepping, so
+  `--engine audio8-onnx` actually synthesizes 44.1 kHz speech from the
+  `Audio8/audio8-TTS-0.1B-ONNX-INT8` model instead of failing to feed the
+  model's stateful input interface.
+- Audio8: adopt the model tokenizer's existing `<|pad|>` token (id 0) when it
+  ships without a configured `pad_token`, so generation no longer fails on the
+  `padding=True` tokenizer call.
+- CLI: allow `--download-models --engine audio8` (add the `audio8` group alias
+  to the engine-group choices alongside `chatterbox` and `mlx-audio`).
+
+### Documentation
+
+- Document the Audio8 engine, model download, and CLI usage in
+  `docs/engines.md` and `docs/model-management.md`.
+# Changelog
+
 ## v0.3.0 — 2025-06-22
 
 ### Added

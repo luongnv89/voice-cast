@@ -7,8 +7,12 @@ The engine resolves that layout, loads all available ONNX sessions, and
 orchestrates them so callers do not need manual multi-session wiring.
 """
 
+import json
 import logging
+import math
 import os
+import re
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -152,6 +156,15 @@ class Audio8Engine(TTSEngineBase):
                     local_files_only=True,
                     trust_remote_code=False,
                 )
+                # The audio8-TTS-0.1B-ONNX-INT8 tokenizer ships with no
+                # special-token wiring: config.json declares pad_token_id=0
+                # (``<|pad|>``) but `tokenizer.pad_token` is None, so the
+                # ``padding=True`` call in :meth:`generate` raises. Adopt the
+                # vocab's existing pad token instead of adding a new one —
+                # adding tokens would grow the vocabulary and desync the
+                # ONNX input space.
+                if self._processor.pad_token is None:
+                    self._processor.pad_token = self._processor.convert_ids_to_tokens(0)
                 logger.info("Audio8 processor loaded successfully")
             except ImportError as e:
                 logger.error("transformers package not installed. Install with: pip install transformers")
@@ -271,8 +284,17 @@ class Audio8Engine(TTSEngineBase):
 
         logger.info("Generating audio with Audio8 ONNX model...")
 
-        # Get ONNX model(s) and processor
         session = self.model
+
+        # Real four-model ArkTTS layout: run the per-token two-stage
+        # autoregressive pipeline (slow AR -> fast AR -> codec decode).
+        if isinstance(session, dict) and self._is_arktts_pipeline(session):
+            audio_data, sample_rate = self._generate_arktts(session, text, speed=speed, **kwargs)
+            return audio_data, sample_rate
+
+        # Legacy layouts: single-session or generic multi-session dicts that
+        # do not expose the ArkTTS per-token interface (kept for backwards
+        # compatibility with existing mocks and single-file installs).
         tokenizer = self.processor
 
         # Tokenize input text
@@ -282,9 +304,7 @@ class Audio8Engine(TTSEngineBase):
         ref_audio = self._load_reference_audio()
 
         # Run inference (handles single InferenceSession or dict of sessions)
-        audio_output = self._run_inference(session, inputs, ref_audio, speed)
-
-        return audio_output
+        return self._run_inference(session, inputs, ref_audio, speed)
 
     def _load_reference_audio(self) -> np.ndarray:
         """Load and preprocess the reference audio file."""
@@ -308,6 +328,452 @@ class Audio8Engine(TTSEngineBase):
             audio_data = librosa.resample(audio_data, orig_sr=sr, target_sr=self._sample_rate)
 
         return audio_data.astype(np.float32)
+
+    # ------------------------------------------------------------------
+    # ArkTTS four-model pipeline support
+    #
+    # The Audio8 0.1B ONNX repo ships a per-token, stateful autoregressive
+    # interface that the legacy single-pass orchestration cannot drive:
+    # codec_encoder (audio -> [10,T] codes), slow_ar (text prompt ->
+    # semantic tokens, recurrent KV cache), fast_ar (semantic token -> 10
+    # codebook tokens/frame), codec_decoder (codes -> waveform). This
+    # follows the upstream Audio8 onnx runtime and also supports the 0.1B
+    # export's consolidated cache layout (single ``cache_keys`` /
+    # ``cache_values`` plus ``conv_states``/``ssm_states``, one step at a
+    # time).
+    # ------------------------------------------------------------------
+
+    _ORT_DTYPES = {
+        "tensor(float)": np.float32,
+        "tensor(float16)": np.float16,
+        "tensor(int64)": np.int64,
+        "tensor(bool)": np.bool_,
+    }
+
+    @staticmethod
+    def _find_session(sessions: dict[str, Any], part: str):
+        """Return the session whose model-file stem contains ``part``."""
+        for key, sess in sessions.items():
+            if part in key:
+                return sess
+        return None
+
+    @classmethod
+    def _is_arktts_pipeline(cls, sessions: dict[str, Any]) -> bool:
+        """Detect the ArkTTS per-token interface from session input names.
+
+        Requires the slow AR (with KV-cache inputs) and fast AR (with
+        ``token_id``/``use_slow_hidden``) plus the codec decoder. Returns
+        False for the generic dict layouts used by tests and older
+        single-file installs.
+        """
+        slow = cls._find_session(sessions, "slow_ar")
+        fast = cls._find_session(sessions, "fast_ar")
+        decoder = cls._find_session(sessions, "codec_decoder")
+        if slow is None or fast is None or decoder is None:
+            return False
+        try:
+            slow_inputs = {item.name for item in slow.get_inputs()}
+            fast_inputs = {item.name for item in fast.get_inputs()}
+        except Exception:
+            return False
+        has_slow_cache = "cache_keys" in slow_inputs or "cache_key_0" in slow_inputs
+        return has_slow_cache and "token_id" in fast_inputs and "codes" in slow_inputs
+
+    def _load_manifest(self) -> dict[str, Any]:
+        """Load ``runtime_manifest.json`` from the install directory."""
+        install_path = self._registry.get_install_path(self._model_id)
+        if install_path is None:
+            return {}
+        manifest_path = Path(install_path) / "runtime_manifest.json"
+        try:
+            return json.loads(manifest_path.read_text())
+        except (OSError, ValueError):
+            return {}
+
+    def _generate_arktts(
+        self,
+        sessions: dict[str, Any],
+        text: str,
+        speed: float = 1.0,
+        **kwargs,
+    ) -> tuple[np.ndarray, int]:
+        """Run the real ArkTTS pipeline and return (audio, sample_rate)."""
+        manifest = self._load_manifest()
+        if not manifest:
+            raise RuntimeError("Audio8 runtime_manifest.json not found; cannot run the ArkTTS pipeline.")
+
+        slow = self._find_session(sessions, "slow_ar")
+        fast = self._find_session(sessions, "fast_ar")
+        decoder = self._find_session(sessions, "codec_decoder")
+        encoder = self._find_session(sessions, "codec_encoder")
+        if slow is None or fast is None or decoder is None:
+            raise RuntimeError("Audio8 ArkTTS sessions (slow_ar/fast_ar/codec_decoder) missing.")
+
+        target_sr = int(manifest.get("sample_rate", 44100))
+        num_codebooks = int(manifest.get("num_codebooks", 10))
+        semantic_begin = int(manifest.get("semantic_begin_id", 65537))
+
+        # Reference voice -> codec codes. Falls back to the bundled
+        # reference profile when the model does not ship a codec encoder.
+        if encoder is not None:
+            codes = self._encode_reference_codes(encoder, target_sr, manifest)
+        else:
+            codes = self._load_bundled_reference_codes()
+        if codes.shape[0] != num_codebooks or codes.shape[1] == 0:
+            raise RuntimeError(f"invalid reference codes shape: {codes.shape}")
+
+        reference_text = kwargs.get("reference_transcript") or ""
+        prompt = self._build_arktts_prompt(text, reference_text, codes, semantic_begin, num_codebooks)
+
+        frames = self._iter_arktts_frames(slow, fast, prompt, manifest, kwargs)
+        if not frames:
+            raise RuntimeError("Audio8 model produced no codec frames.")
+        generated = np.stack(frames, axis=1)  # [num_codebooks, T]
+
+        audio = self._decode_arktts(decoder, generated, num_codebooks)
+        if speed != 1.0:
+            try:
+                import scipy.signal
+            except ImportError as e:
+                raise ImportError(
+                    "scipy required for Audio8 speed adjustment. Install with: pip install voicecast[audio8]"
+                ) from e
+            audio = scipy.signal.resample(audio, int(len(audio) * (1.0 / speed)))
+
+        return np.asarray(audio, dtype=np.float32), target_sr
+
+    def _encode_reference_codes(
+        self,
+        encoder: Any,
+        target_sr: int,
+        manifest: dict[str, Any],
+    ) -> np.ndarray:
+        """Encode the speaker reference WAV into ``[10, T]`` codec frames."""
+        import soundfile as sf
+
+        audio, source_sr = sf.read(self.speaker_wav, dtype="float32", always_2d=True)
+        audio = audio.mean(axis=1)
+        if not np.isfinite(audio).all():
+            raise ValueError("reference audio contains non-finite samples")
+        if int(source_sr) != int(target_sr):
+            try:
+                import scipy.signal
+            except ImportError as e:
+                raise ImportError(
+                    "scipy required for Audio8 reference resampling. Install with: pip install voicecast[audio8]"
+                ) from e
+            factor = math.gcd(int(source_sr), int(target_sr))
+            audio = scipy.signal.resample_poly(audio, target_sr // factor, int(source_sr) // factor)
+        # The codec operates on fixed-size frames; pad so no partial frame
+        # reaches the encoder.
+        frame_size = int(manifest.get("codec_frame_size", 2048))
+        padding = (-audio.size) % frame_size
+        if padding:
+            audio = np.pad(audio, (0, padding))
+        values = np.ascontiguousarray(audio.reshape(1, 1, -1).astype(np.float32))
+        try:
+            input_type = encoder.get_inputs()[0].type
+            if "float16" in input_type:
+                values = values.astype(np.float16)
+            codes = np.asarray(encoder.run(None, {"audio": values})[0], dtype=np.int64)
+        except Exception as exc:
+            raise RuntimeError(f"Audio8 codec_encoder inference failed: {exc}") from exc
+        if codes.ndim == 3:
+            codes = codes[0]
+        return codes
+
+    def _load_bundled_reference_codes(self) -> np.ndarray:
+        """Load ``reference_codes.npy`` shipped with the model, if present."""
+        install_path = self._registry.get_install_path(self._model_id)
+        path = Path(install_path) / "reference_codes.npy"
+        if install_path is None or not path.exists():
+            raise RuntimeError("Audio8 codec_encoder missing and no bundled reference_codes.npy found.")
+        return np.asarray(np.load(path), dtype=np.int64)
+
+    # -- ArkTTS prompt construction -------------------------------------
+
+    _CJK_RANGES = (
+        "\u1100-\u11ff\u2e80-\u2fdf\u3000-\u303f\u3040-\u30ff\u3100-\u31ff"
+        "\u3400-\u4dbf\u4e00-\u9fff\ua960-\ua97f\uac00-\ud7a3\ud7b0-\ud7ff"
+        "\uf900-\ufaff\ufe30-\ufe4f\uff01-\uff9f\U00020000-\U0002fa1f"
+    )
+    _CJK_CHARACTER_RE = re.compile(rf"[{_CJK_RANGES}]")
+    _LINE_BREAK_RE = re.compile(r"[\r\n\v\f\x1c-\x1e\x85\u2028\u2029]")
+
+    @classmethod
+    def _clean_text(cls, text: str) -> str:
+        """Strip control characters and normalize whitespace."""
+        value = "".join(
+            char if char.isspace() else "" if unicodedata.category(char).startswith("C") else char for char in str(text)
+        )
+
+        def replace(match: re.Match) -> str:
+            left = value[match.start() - 1] if match.start() else ""
+            right = value[match.end()] if match.end() < len(value) else ""
+            if (
+                cls._LINE_BREAK_RE.search(match.group())
+                and cls._CJK_CHARACTER_RE.fullmatch(left)
+                and cls._CJK_CHARACTER_RE.fullmatch(right)
+            ):
+                return ""
+            return " "
+
+        return re.sub(r"\s+", replace, value).strip()
+
+    @classmethod
+    def _format_reference_text(cls, text: str) -> str:
+        text = cls._clean_text(text)
+        return text if re.search(r"<\|speaker:\d+\|>", text) else f"<|speaker:0|>{text}"
+
+    def _encode_part(self, part: str) -> list[int]:
+        """Tokenize a prompt fragment with the loaded Audio8 processor."""
+        encoded = self.processor(part, add_special_tokens=False)
+        ids = encoded["input_ids"] if isinstance(encoded, dict) else encoded.input_ids
+        return list(ids)
+
+    def _build_arktts_prompt(
+        self,
+        target_text: str,
+        reference_text: str,
+        codes: np.ndarray,
+        semantic_begin: int,
+        num_codebooks: int,
+    ) -> np.ndarray:
+        """Build the ``[1, num_codebooks + 1, T]`` prompt table.
+
+        Row 0 carries the text prefix, the semantic ids derived from the
+        reference codes, and the target text suffix. Rows 1.. ``codes``
+        repeat the reference codec frames under the semantic span, exactly
+        as the upstream Audio8 onnx runtime does.
+        """
+        # Use the bundled reference transcript when the caller did not
+        # provide one; an empty speaker tag is valid too.
+        reference_parts = [
+            "<|im_start|>system\n",
+            "convert the provided text to speech reference to the following:\n\nText:\n",
+            self._format_reference_text(reference_text),
+            "\n\nSpeech:\n",
+        ]
+        suffix_parts = [
+            "<|im_end|>\n",
+            "<|im_start|>user\n",
+            self._clean_text(target_text),
+            "<|im_end|>\n",
+            "<|im_start|>assistant\n<|voice|>",
+        ]
+        prefix = [token for part in reference_parts for token in self._encode_part(part)]
+        suffix = [token for part in suffix_parts for token in self._encode_part(part)]
+
+        semantic_ids = (codes[0] + semantic_begin).tolist()
+        row0 = np.asarray(prefix + semantic_ids + suffix, dtype=np.int64)
+        values = np.zeros((num_codebooks + 1, row0.size), dtype=np.int64)
+        values[0] = row0
+        begin = len(prefix)
+        values[1:, begin : begin + codes.shape[1]] = codes
+        return values[np.newaxis]
+
+    # -- ArkTTS autoregressive generation -------------------------------
+
+    @staticmethod
+    def _static_shape(io: Any) -> tuple[int, ...]:
+        """Concrete tensor shape, coercing symbolic dims to 1."""
+        return tuple(int(d) if isinstance(d, int) else 1 for d in io.shape)
+
+    def _iter_arktts_frames(
+        self,
+        slow: Any,
+        fast: Any,
+        prompt: np.ndarray,
+        manifest: dict[str, Any],
+        kwargs: dict[str, Any],
+    ) -> list[np.ndarray]:
+        """Slow-AR + fast-AR per-token loop; returns codec frames [10, T]."""
+        num_codebooks = int(manifest["num_codebooks"])
+        semantic_begin = int(manifest["semantic_begin_id"])
+        semantic_end = int(manifest["semantic_end_id"])
+        im_end = int(manifest["im_end_id"])
+        codebook_size = int(manifest["codebook_size"])
+        num_layers = int(manifest["num_layers"])
+        num_fast_layers = int(manifest["num_fast_layers"])
+        max_seq_len = int(manifest["max_seq_len"])
+
+        temperature = float(kwargs.get("temperature", 0.7))
+        top_p = float(kwargs.get("top_p", 0.9))
+        top_k = int(kwargs.get("top_k", 50))
+        seed = int(kwargs.get("seed", 42))
+        max_new_tokens = int(kwargs.get("max_new_tokens", 256))
+
+        prompt_len = int(prompt.shape[2])
+        if prompt_len >= max_seq_len:
+            raise RuntimeError(f"prompt length {prompt_len} exceeds max sequence length {max_seq_len}")
+        max_new_tokens = min(max_new_tokens, max_seq_len - prompt_len)
+        rng = np.random.default_rng(seed)
+
+        slow_inputs = {item.name: item for item in slow.get_inputs()}
+        fast_inputs = {item.name: item for item in fast.get_inputs()}
+        dtype_map = Audio8Engine._ORT_DTYPES
+
+        if "cache_keys" in slow_inputs:
+            # Consolidated 0.1B layout: one big KV array plus conv/ssm state.
+            cache_keys = np.zeros(self._static_shape(slow_inputs["cache_keys"]), dtype=np.float32)
+            cache_values = np.zeros(self._static_shape(slow_inputs["cache_values"]), dtype=np.float32)
+            conv_states = np.zeros(self._static_shape(slow_inputs["conv_states"]), dtype=np.float32)
+            ssm_states = np.zeros(self._static_shape(slow_inputs["ssm_states"]), dtype=np.float32)
+
+            def slow_step(pos: int, column: np.ndarray):
+                nonlocal conv_states, ssm_states
+                out = slow.run(
+                    None,
+                    {
+                        "codes": column.astype(np.int64),
+                        "position": np.asarray([pos], dtype=np.int64),
+                        "cache_keys": cache_keys,
+                        "cache_values": cache_values,
+                        "conv_states": conv_states,
+                        "ssm_states": ssm_states,
+                    },
+                )
+                cache_keys[:, :, :, pos, :] = np.asarray(out[2])
+                cache_values[:, :, :, pos, :] = np.asarray(out[3])
+                conv_states = np.asarray(out[4])
+                ssm_states = np.asarray(out[5])
+                return np.asarray(out[0])[0, -1], np.asarray(out[1])[:, -1:, :]
+
+        else:
+            # Per-layer layout (upstream 0.6B): separate cache_key_i arrays.
+            cache_shape = self._static_shape(slow_inputs["cache_key_0"])
+            cache_dtype = dtype_map.get(slow_inputs["cache_key_0"].type, np.float32)
+            caches = [np.zeros(cache_shape, dtype=cache_dtype) for _ in range(2 * num_layers)]
+
+            def slow_step(pos: int, column: np.ndarray):
+                feeds = {
+                    "codes": column.astype(np.int64),
+                    "input_pos": np.asarray([pos], dtype=np.int64),
+                }
+                for i in range(num_layers):
+                    feeds[f"cache_key_{i}"] = caches[2 * i]
+                    feeds[f"cache_value_{i}"] = caches[2 * i + 1]
+                out = slow.run(None, feeds)
+                for i, delta in enumerate(out[2:]):
+                    caches[i][:, :, pos, :] = np.asarray(delta)
+                return np.asarray(out[0])[0, -1], np.asarray(out[1])[:, -1:, :]
+
+        fast_hidden_dtype = dtype_map.get(fast_inputs["slow_hidden"].type, np.float32)
+        fast_cache_shape = self._static_shape(fast_inputs["cache_key_0"])
+        fast_cache_dtype = dtype_map.get(fast_inputs["cache_key_0"].type, np.float32)
+
+        def fast_step(token_id: int, use_hidden: bool, pos: int, caches: list):
+            feeds = {
+                "slow_hidden": np.asarray(hidden, dtype=fast_hidden_dtype),
+                "token_id": np.asarray([[token_id]], dtype=np.int64),
+                "use_slow_hidden": np.asarray([use_hidden], dtype=np.bool_),
+                "input_pos": np.asarray([pos], dtype=np.int64),
+            }
+            for i in range(num_fast_layers):
+                feeds[f"cache_key_{i}"] = caches[2 * i]
+                feeds[f"cache_value_{i}"] = caches[2 * i + 1]
+            out = fast.run(None, feeds)
+            for i, delta in enumerate(out[1:]):
+                caches[i][:, :, pos, :] = np.asarray(delta)[:, :, -1, :]
+            return np.asarray(out[0])[0, -1]
+
+        # Prefill: run the prompt through the slow AR one column at a time.
+        for pos in range(prompt_len):
+            logits, hidden = slow_step(pos, prompt[:, :, pos : pos + 1])
+
+        previous: list[int] = []
+        frames: list[np.ndarray] = []
+        for step in range(max_new_tokens):
+            semantic = self._sample_semantic(
+                logits,
+                previous,
+                semantic_begin,
+                semantic_end,
+                im_end,
+                temperature,
+                top_p,
+                top_k,
+                rng,
+            )
+            if semantic == im_end:
+                break
+            previous.append(semantic)
+            previous = previous[-10:]
+            fast_caches = [np.zeros(fast_cache_shape, dtype=fast_cache_dtype) for _ in range(2 * num_fast_layers)]
+            fast_step(0, True, 0, fast_caches)
+            token = min(max(semantic - semantic_begin, 0), codebook_size - 1)
+            codebooks = [token]
+            for fast_pos in range(1, num_codebooks):
+                fast_logits = fast_step(token, False, fast_pos, fast_caches)
+                token = self._sample(fast_logits, temperature, top_p, top_k, rng)
+                codebooks.append(token)
+            frames.append(np.asarray(codebooks, dtype=np.int64))
+            if step + 1 >= max_new_tokens:
+                break
+            column = np.concatenate([[int(semantic)], codebooks]).reshape(1, -1, 1)
+            logits, hidden = slow_step(prompt_len + step, column)
+
+        return frames
+
+    @staticmethod
+    def _sample(logits: np.ndarray, temperature: float, top_p: float, top_k: int, rng) -> int:
+        """Top-p/top-k softmax sampling (ported from the upstream runtime)."""
+        values = np.asarray(logits, dtype=np.float64).reshape(-1)
+        order = np.argsort(values)[::-1]
+        sorted_values = values[order]
+        base = np.exp(sorted_values - np.max(sorted_values))
+        base /= base.sum()
+        cumulative = np.cumsum(base)
+        remove = (cumulative > top_p) | (np.arange(base.size) >= top_k)
+        remove[0] = False
+        masked = values.copy()
+        masked[order[remove]] = -np.inf
+        scaled = masked / max(float(temperature), 1e-5)
+        scaled -= np.max(scaled)
+        probs = np.exp(scaled)
+        probs /= probs.sum()
+        noise = -np.log(np.clip(rng.random(probs.size), 1e-12, 1.0))
+        return int(np.argmax(probs / noise))
+
+    def _sample_semantic(
+        self,
+        logits: np.ndarray,
+        previous: list[int],
+        semantic_begin: int,
+        semantic_end: int,
+        im_end: int,
+        temperature: float,
+        top_p: float,
+        top_k: int,
+        rng,
+    ) -> int:
+        """Sample a semantic (absolute) id; avoid immediate repeats."""
+        allowed_ids = np.concatenate([np.arange(semantic_begin, semantic_end + 1), [im_end]])
+        values = np.asarray(logits).reshape(-1)
+        if values.size == allowed_ids.size:
+            allowed_logits = values
+        else:
+            selected = allowed_ids[allowed_ids < values.size]
+            allowed_logits = values[selected]
+            allowed_ids = selected
+        normal_index = self._sample(allowed_logits, temperature, top_p, top_k, rng)
+        normal = int(allowed_ids[normal_index])
+        high_index = self._sample(allowed_logits, 1.0, 0.9, top_k, rng)
+        high = int(allowed_ids[high_index])
+        if semantic_begin <= normal <= semantic_end and normal in previous:
+            return high
+        return normal
+
+    def _decode_arktts(self, decoder: Any, codes: np.ndarray, num_codebooks: int) -> np.ndarray:
+        """Decode ``[num_codebooks, T]`` frames into a mono waveform."""
+        values = np.asarray(codes, dtype=np.int64)
+        if values.ndim == 2:
+            values = values[np.newaxis]
+        if values.ndim != 3 or values.shape[1] != num_codebooks:
+            raise ValueError(f"invalid generated codes shape: {values.shape}")
+        audio = decoder.run(None, {"codes": values})[0]
+        return np.asarray(audio, dtype=np.float32).reshape(-1)
 
     def _run_inference(
         self,
