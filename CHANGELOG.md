@@ -1,5 +1,62 @@
 # Changelog
 
+## v0.3.0 — 2025-06-22
+
+### Added
+
+- Audio8 TTS model support via the new `Audio8TTS` engine descriptor (#110)
+- GUI Generate button is now gated until all inputs (text, source, target) are valid (#105)
+- Explicit model management via CLI (`vcloner.py --download-models`) and GUI Model Manager (#6)
+- Chatterbox TTS multi-engine architecture with Turbo and Standard variants (#2)
+
+### Fixed
+
+- Generation UX: persist save filename, stage text/speed, and temp copy (#107)
+- Safely terminate the generation thread on window close to avoid hangs (#106)
+- Wire Chatterbox model variant to its checkpoint end-to-end (#88)
+- Signal CLI failures via exit codes; fail fast on missing reference audio (#87)
+- Stream model download progress and bound close waits (#86)
+- Derive Coqui cache directory from backend defaults (#85)
+- Fix install command and remove stale `main.py` references (#109)
+- Replace invalid engine-controls fallback (#39)
+- Make CI fail on unit-test failures (#38)
+
+### Changed
+
+- Single `list_models()` sweep per refresh instead of repeated calls (#104)
+- Cache cloner and engine per engine name at app scope (#103)
+- Extract collaborators from `VoiceCloningApp` (#101)
+- Clean up `engine-controls` access paths (#100)
+- Resolve stale root-level files (#98)
+- Replace model registry singleton with injected registry (#43)
+- Descriptor-based engine controls and MLX voice dedup (#42)
+- Introduce `EngineDescriptor` and explicit engine bootstrap (#41)
+- Untrack 66 MB sample media from git (#99)
+
+### Documentation
+
+- Re-capture screenshots for the current VoiceCast UI (#108)
+- Add `CODE_REVIEW.md` with clean and cleanup audit results (#102)
+- Document Python matrix decision and EOL revisit trigger (#92)
+- Add TTS fork adopt/defer spike decision (#89)
+- Add agent environment and config docs (`AGENTS.md`, `CLAUDE.md`) (#81)
+
+### Infrastructure
+
+- Bump `actions/setup-python` from v5 to v7 (#95)
+- Bump `actions/upload-artifact` from v4 to v7 (#94)
+- Bump `actions/checkout` from v4 to v7 (#93)
+- Make security scan real: refresh ruff, declare `transformers` (#91)
+- Pin dev tooling and prove lockfile bootstrap (#83)
+- Add pinned `requirements.txt` lockfile (#82)
+
+### Testing
+
+- Add characterization tests at component seams (#97)
+- Add coverage measurement to the CI test job (#96)
+- Isolate module mocking behind `conftest` import stubs (#84)
+- Add GUI import/offscreen smoke test (#90)
+
 ## Unreleased
 
 ### Added

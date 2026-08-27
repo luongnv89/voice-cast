@@ -69,4 +69,4 @@ graph LR
 
 ## Version
 
-This documentation is for VoiceCast v0.2.0.
+This documentation is for VoiceCast v0.3.0.

@@ -1,6 +1,6 @@
 [project]
 name = "voicecast"
-version = "0.2.0"
+version = "0.3.0"
 description = "Your words, any voice - Voice cloning and text-to-speech application"
 readme = "README.md"
 license = { text = "MIT" }

@@ -6,7 +6,7 @@
   <a href="https://github.com/luongnv89/voice-cast/stargazers"><img src="https://img.shields.io/github/stars/luongnv89/voice-cast?style=flat-square" alt="GitHub Stars"></a>
   <a href="https://github.com/luongnv89/voice-cast/blob/main/LICENSE"><img src="https://img.shields.io/github/license/luongnv89/voice-cast?style=flat-square" alt="MIT License"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10+-blue?style=flat-square" alt="Python 3.10+"></a>
-  <img src="https://img.shields.io/badge/version-0.2.0-green?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/version-0.3.0-green?style=flat-square" alt="Version">
   <a href="https://github.com/luongnv89/voice-cast/issues"><img src="https://img.shields.io/github/issues/luongnv89/voice-cast?style=flat-square" alt="Issues"></a>
 </p>
 
