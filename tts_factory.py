@@ -1,3 +1,4 @@
+import contextlib
 import logging
 from dataclasses import dataclass, field
 from typing import Any
@@ -131,58 +132,70 @@ class TTSFactory:
 
 
 def _register_default_engines():
+    # Each engine is registered independently of the GUI toolkit. The engine
+    # class itself is the availability gate; GUI controls are optional and
+    # imported separately so missing PySide6 does not hide CLI engines.
     try:
         from engines.coqui_engine import CoquiEngine
-        from gui.engine_controls import CoquiControls
 
-        TTSFactory.register(
-            EngineDescriptor(
-                name="coqui",
-                engine_class=CoquiEngine,
-                display_name="Coqui XTTS v2",
-                requires_reference_audio=True,
-                supports_preset_voices=False,
-                controls_class=CoquiControls,
+        try:
+            from gui.engine_controls import CoquiControls
+        except ImportError:
+            CoquiControls = None
+            logger.debug("CoquiControls not available (PySide6 missing) – engine still registered")
+
+        with contextlib.suppress(ValueError):
+            TTSFactory.register(
+                EngineDescriptor(
+                    name="coqui",
+                    engine_class=CoquiEngine,
+                    display_name="Coqui XTTS v2",
+                    requires_reference_audio=True,
+                    supports_preset_voices=False,
+                    controls_class=CoquiControls,
+                )
             )
-        )
     except ImportError as e:
         logger.warning(f"Coqui engine not available: {e}")
 
     try:
         from engines.chatterbox_engine import ChatterboxEngine
-        from gui.engine_controls import ChatterboxControls
 
-        TTSFactory.register(
-            EngineDescriptor(
-                name="chatterbox-turbo",
-                engine_class=ChatterboxEngine,
-                display_name="Chatterbox Turbo (350M)",
-                requires_reference_audio=True,
-                supports_preset_voices=False,
-                default_kwargs={"variant": "turbo"},
-                controls_class=ChatterboxControls,
-            )
-        )
+        try:
+            from gui.engine_controls import ChatterboxControls
+        except ImportError:
+            ChatterboxControls = None
+            logger.debug("ChatterboxControls not available (PySide6 missing) – engines still registered")
 
-        TTSFactory.register(
-            EngineDescriptor(
-                name="chatterbox-standard",
-                engine_class=ChatterboxEngine,
-                display_name="Chatterbox Standard (500M)",
-                requires_reference_audio=True,
-                supports_preset_voices=False,
-                default_kwargs={"variant": "standard"},
-                controls_class=ChatterboxControls,
-            )
-        )
+        for _name, _variant in [
+            ("chatterbox-turbo", "turbo"),
+            ("chatterbox-standard", "standard"),
+        ]:
+            with contextlib.suppress(ValueError):
+                TTSFactory.register(
+                    EngineDescriptor(
+                        name=_name,
+                        engine_class=ChatterboxEngine,
+                        display_name=f"Chatterbox {'Turbo (350M)' if _variant == 'turbo' else 'Standard (500M)'}",
+                        requires_reference_audio=True,
+                        supports_preset_voices=False,
+                        default_kwargs={"variant": _variant},
+                        controls_class=ChatterboxControls,
+                    )
+                )
     except ImportError as e:
         logger.warning(f"Chatterbox engines not available: {e}")
 
     try:
         from engines.mlx_audio_engine import MlxAudioEngine
-        from gui.engine_controls import MlxCsmControls, MlxKokoroControls
 
-        TTSFactory.register(
+        try:
+            from gui.engine_controls import MlxCsmControls, MlxKokoroControls
+        except ImportError:
+            MlxCsmControls = MlxKokoroControls = None
+            logger.debug("MLX controls not available (PySide6 missing) – engines still registered")
+
+        for _desc in [
             EngineDescriptor(
                 name="mlx-kokoro",
                 engine_class=MlxAudioEngine,
@@ -192,10 +205,7 @@ def _register_default_engines():
                 platform_restriction="apple_silicon",
                 default_kwargs={"variant": "kokoro"},
                 controls_class=MlxKokoroControls,
-            )
-        )
-
-        TTSFactory.register(
+            ),
             EngineDescriptor(
                 name="mlx-csm",
                 engine_class=MlxAudioEngine,
@@ -205,25 +215,33 @@ def _register_default_engines():
                 platform_restriction="apple_silicon",
                 default_kwargs={"variant": "csm"},
                 controls_class=MlxCsmControls,
-            )
-        )
+            ),
+        ]:
+            with contextlib.suppress(ValueError):
+                TTSFactory.register(_desc)
     except ImportError as e:
         logger.warning(f"MLX Audio engines not available: {e}")
 
     try:
         from engines.audio8_engine import Audio8Engine
-        from gui.engine_controls import Audio8Controls
 
-        TTSFactory.register(
-            EngineDescriptor(
-                name="audio8-onnx",
-                engine_class=Audio8Engine,
-                display_name="Audio8 TTS (1B)",
-                requires_reference_audio=True,
-                supports_preset_voices=False,
-                controls_class=Audio8Controls,
+        try:
+            from gui.engine_controls import Audio8Controls
+        except ImportError:
+            Audio8Controls = None
+            logger.debug("Audio8Controls not available (PySide6 missing) – engine still registered")
+
+        with contextlib.suppress(ValueError):
+            TTSFactory.register(
+                EngineDescriptor(
+                    name="audio8-onnx",
+                    engine_class=Audio8Engine,
+                    display_name="Audio8 TTS (1B)",
+                    requires_reference_audio=True,
+                    supports_preset_voices=False,
+                    controls_class=Audio8Controls,
+                )
             )
-        )
     except ImportError as e:
         logger.warning(f"Audio8 engine not available: {e}")
 

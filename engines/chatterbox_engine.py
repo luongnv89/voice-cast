@@ -86,7 +86,9 @@ class ChatterboxEngine(TTSEngineBase):
                 logger.info(f"Chatterbox {self.variant} model loaded successfully")
             except ImportError as e:
                 logger.error("chatterbox-tts package not installed. Install with: pip install chatterbox-tts")
-                raise ImportError("chatterbox-tts package required. Install with: pip install chatterbox-tts") from e
+                raise ImportError(
+                    f"chatterbox-tts package required for {self._model_id}. Install with: pip install chatterbox-tts"
+                ) from e
         return self._model
 
     @classmethod
