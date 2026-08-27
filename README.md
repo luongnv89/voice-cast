@@ -70,7 +70,7 @@ VoiceCast solves all three. Record 5–30 seconds of any voice, and generate nat
 ```bash
 # Clone the repository
 git clone https://github.com/luongnv89/voice-cast.git
-cd voicecast
+cd voice-cast
 
 # Create virtual environment
 python3.10 -m venv .venv
@@ -83,6 +83,25 @@ pip install -e .
 python vcloner.py --list-models
 python vcloner.py --download-models coqui-xtts-v2
 ```
+
+<details>
+<summary>CPU-only install (avoid 8 GB CUDA download)</summary>
+
+The default `pip install -e .` pulls CUDA-enabled `torch==2.6.0` plus NVIDIA wheels (~2.5 GB download, ~8 GB installed) and can fail on disk-quota-limited machines or CI (`OSError: Disk quota exceeded`). VoiceCast runs fine on CPU — GPU is optional.
+
+```bash
+# 1) Install the small CPU-only PyTorch wheels first
+pip install --index-url https://download.pytorch.org/whl/cpu torch torchaudio
+
+# 2) Install VoiceCast without re-pulling CUDA deps (reuse the CPU wheels)
+pip install -e . --no-deps
+# or, if you prefer a single step and accept the CUDA payload when space permits:
+# pip install -e .
+```
+
+Trade-off: CPU inference is slower than CUDA but avoids the large download; model quality is identical. To use NVIDIA acceleration later, reinstall torch from the CUDA index (https://pytorch.org). See also `docs/agent-environment.md`.
+
+</details>
 
 **Launch the GUI:**
 ```bash

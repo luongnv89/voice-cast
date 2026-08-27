@@ -1,3 +1,4 @@
+import contextlib
 import logging
 import os
 import warnings
@@ -13,7 +14,7 @@ from models import ModelDownloader, ModelInfo
 from models.download_progress import ProgressCallback
 from models.model_registry import ModelRegistry, get_registry
 from tts_engine_base import TTSEngineBase
-from tts_factory import TTSFactory
+from tts_factory import TTSFactory, bootstrap_engines
 
 # Suppress warnings globally
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -65,6 +66,14 @@ class VoiceCloner:
         self.auto_download = auto_download
         self._registry = registry or get_registry()
 
+        # Auto-bootstrap engines so the documented README snippet
+        # ``VoiceCloner(speaker_wav=..., engine=...)`` works without an
+        # explicit ``bootstrap_engines()`` call. CLI already bootstraps
+        # via vcloner.main(); this keeps API and CLI consistent.
+        if not TTSFactory.available_engines():
+            with contextlib.suppress(Exception):
+                bootstrap_engines()
+
         # Create or use provided engine
         if engine is None:
             engine = "coqui"
@@ -76,6 +85,13 @@ class VoiceCloner:
                 metadata = TTSFactory.get_engine_metadata(engine)
                 requires_voice = metadata.get("requires_reference_audio", True)
             except ValueError:
+                # Unknown engine – it may be known after bootstrap; try once more
+                if not TTSFactory.available_engines():
+                    with contextlib.suppress(Exception):
+                        bootstrap_engines()
+                    with contextlib.suppress(ValueError):
+                        metadata = TTSFactory.get_engine_metadata(engine)
+                        requires_voice = metadata.get("requires_reference_audio", True)
                 pass  # Unknown engine, assume it needs voice file
         else:
             requires_voice = getattr(engine, "requires_reference_audio", True)
@@ -243,6 +259,9 @@ class VoiceCloner:
 
     def switch_engine(self, engine: str, **engine_kwargs) -> None:
         """Switch this cloner to another engine/model without implicit downloads."""
+        if not TTSFactory.available_engines():
+            with contextlib.suppress(Exception):
+                bootstrap_engines()
         engine_kwargs.setdefault("auto_download", self.auto_download)
         engine_kwargs.setdefault("registry", self._registry)
         self.engine = TTSFactory.create(

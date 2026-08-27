@@ -135,8 +135,14 @@ class ModelRegistry:
         # TTS_HOME and XDG_DATA_HOME — derive ours from the same contract.
         coqui_cache = _coqui_default_cache_dir(home)
 
-        # Chatterbox uses HuggingFace hub cache
-        hf_cache = Path(os.environ.get("HF_HOME", home / ".cache" / "huggingface")) / "hub"
+        # Chatterbox uses HuggingFace hub cache. Respect HF_HUB_CACHE directly
+        # when set (it may already point at the hub directory), otherwise fall
+        # back to HF_HOME/hub or the default home cache.
+        hub_cache_env = os.environ.get("HF_HUB_CACHE")
+        if hub_cache_env:
+            hf_cache = Path(hub_cache_env).expanduser()
+        else:
+            hf_cache = Path(os.environ.get("HF_HOME", home / ".cache" / "huggingface")) / "hub"
 
         self._cache_dirs["coqui"] = coqui_cache
         self._cache_dirs["chatterbox"] = hf_cache
@@ -230,10 +236,40 @@ class ModelRegistry:
                 return True, hub_path
 
         elif model.engine == "audio8-onnx":
-            # Audio8 uses HuggingFace hub format
+            # Audio8 uses HuggingFace hub format and snapshot_download stores
+            # files under hub_path/snapshots/<revision>/. is_installed must
+            # resolve to a directory that actually contains model files so
+            # list-models and generation agree, and get_install_path returns
+            # a usable path for _get_model_path.
             hub_path = cache_dir / f"models--{model.model_path_checker.replace('/', '--')}"
             if hub_path.exists():
-                return True, hub_path
+                snapshots_dir = hub_path / "snapshots"
+                if snapshots_dir.exists():
+                    # Prefer snapshots that contain ONNX files; fall back to
+                    # the most-recent snapshot directory if none contain ONNX
+                    # yet (e.g., partially downloaded state).
+                    try:
+                        candidates = sorted(
+                            [p for p in snapshots_dir.iterdir() if p.is_dir()],
+                            key=lambda p: p.stat().st_mtime,
+                            reverse=True,
+                        )
+                    except FileNotFoundError:
+                        candidates = []
+                    for snap in candidates:
+                        if any(snap.rglob("*.onnx")):
+                            return True, snap
+                    if candidates:
+                        return True, candidates[0]
+                # No snapshots layout – handle direct or hub-level installs
+                if any(hub_path.rglob("*.onnx")):
+                    return True, hub_path
+                direct_path = cache_dir / model.model_path_checker
+                if direct_path.exists() and any(direct_path.rglob("*.onnx")):
+                    return True, direct_path
+                # Hub dir exists but contains no model files yet – treat as
+                # not installed to keep generation and list-models consistent
+                return False, None
 
         return False, None
 

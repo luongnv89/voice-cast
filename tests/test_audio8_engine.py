@@ -107,12 +107,24 @@ class TestAudio8EngineProperties:
 class TestAudio8EngineModelLoading:
     """Tests for model loading behavior."""
 
-    def test_model_not_installed_raises_error(self):
-        """Test that using an uninstalled model raises ModelNotInstalledError."""
+    def test_model_not_installed_raises_error(self, tmp_path, monkeypatch):
+        """Test that using an uninstalled model raises ModelNotInstalledError.
+
+        Isolated from the global Hugging Face cache so a real
+        ``--download-models audio8-tts`` on disk does not flip the
+        assertion.
+        """
         from engines.audio8_engine import Audio8Engine
 
+        # Use an isolated HF cache directory for this test
+        isolated_cache = tmp_path / "hf_hub"
+        monkeypatch.setenv("HF_HOME", str(tmp_path))
+        monkeypatch.setenv("HF_HUB_CACHE", str(isolated_cache))
         registry = ModelRegistry()
-        # audio8-tts should not be installed by default
+        # Ensure the audio8 cache dir points at the isolated location even
+        # if HF_HUB_CACHE was already read at import time
+        registry._cache_dirs["audio8-onnx"] = isolated_cache
+        # audio8-tts should not be installed in the isolated cache
         assert not registry.is_installed("audio8-tts")
 
         engine = Audio8Engine(speaker_wav="voice.wav", registry=registry)
@@ -125,8 +137,9 @@ class TestAudio8EngineModelLoading:
         assert "vcloner.py --download-models" in str(exc_info.value)
 
     @patch("engines.audio8_engine.Audio8Engine._check_model_installed", return_value=True)
+    @patch("engines.audio8_engine.Audio8Engine._get_all_onnx_files", return_value=[])
     @patch("engines.audio8_engine.Audio8Engine._get_model_path", return_value="/fake/model.onnx")
-    def test_lazy_model_loading(self, mock_path, mock_installed):
+    def test_lazy_model_loading(self, mock_path, mock_all, mock_installed):
         """Test that model is loaded lazily on first access."""
         from engines.audio8_engine import Audio8Engine
 
@@ -140,11 +153,16 @@ class TestAudio8EngineModelLoading:
 
             # Access model property
             _ = engine.model
-            assert engine._model is mock_session
+            # Single-file or multi-file dict both acceptable; mock must be contained
+            if isinstance(engine._model, dict):
+                assert mock_session in engine._model.values()
+            else:
+                assert engine._model is mock_session
 
     @patch("engines.audio8_engine.Audio8Engine._check_model_installed", return_value=True)
+    @patch("engines.audio8_engine.Audio8Engine._get_all_onnx_files", return_value=[])
     @patch("engines.audio8_engine.Audio8Engine._get_model_path", return_value="/fake/model.onnx")
-    def test_auto_download_allows_loading(self, mock_path, mock_installed):
+    def test_auto_download_allows_loading(self, mock_path, mock_all, mock_installed):
         """Test that auto_download=True allows model loading."""
         from engines.audio8_engine import Audio8Engine
 
