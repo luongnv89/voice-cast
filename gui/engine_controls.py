@@ -395,6 +395,54 @@ class MlxCsmControls(EngineControlsBase):
         }
 
 
+class Audio8Controls(EngineControlsBase):
+    """Control widget for Audio8 TTS engine."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(SPACING.md)
+
+        # Speed slider
+        speed_group = StyledGroupBox("Speed")
+        speed_layout = QVBoxLayout()
+        speed_layout.setContentsMargins(SPACING.sm, SPACING.sm, SPACING.sm, SPACING.sm)
+
+        self.speed_slider = StyledSlider(
+            min_val=50,
+            max_val=200,
+            initial=100,
+            min_label="0.5x",
+            max_label="2.0x",
+            value_format="{:.2f}x",
+            value_scale=0.01,
+        )
+        self.speed_slider.slider.valueChanged.connect(self._on_param_changed)
+        speed_layout.addWidget(self.speed_slider)
+
+        speed_group.setLayout(speed_layout)
+        layout.addWidget(speed_group)
+
+        # Info label
+        info_label = StyledLabel(
+            "Audio8 uses the selected voice reference file for voice cloning.",
+            role="muted",
+        )
+        info_label.setWordWrap(True)
+        layout.addWidget(info_label)
+
+    def _on_param_changed(self):
+        self.parameters_changed.emit(self.get_parameters())
+
+    def get_parameters(self) -> dict[str, Any]:
+        return {
+            "speed": self.speed_slider.scaled_value(),
+        }
+
+
 class EngineControlsFactory:
     """Factory for creating engine-specific control widgets."""
 

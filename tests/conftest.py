@@ -14,7 +14,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 # installs none of them). A meta-path finder serves lightweight stand-ins only
 # when the real package is absent, so every test file -- run alone or together
 # -- sees identical import behavior with no cross-file mock leakage.
-_STUB_MODULES = frozenset({"torch", "transformers", "TTS", "chatterbox", "mlx_audio"})
+_STUB_MODULES = frozenset({"torch", "transformers", "TTS", "chatterbox", "mlx_audio", "onnxruntime", "huggingface_hub"})
 
 
 class _StubModule(types.ModuleType):

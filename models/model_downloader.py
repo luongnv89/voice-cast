@@ -110,6 +110,10 @@ class ModelDownloader:
                 from models.downloaders.mlx_downloader import MlxDownloader
 
                 self._downloaders[engine] = MlxDownloader()
+            elif engine == "audio8-onnx":
+                from models.downloaders.audio8_downloader import Audio8Downloader
+
+                self._downloaders[engine] = Audio8Downloader()
             else:
                 raise ModelDownloadError(
                     f"engine:{engine}",

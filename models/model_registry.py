@@ -49,6 +49,7 @@ class ModelRegistry:
         "chatterbox-standard": "chatterbox-standard",
         "mlx-kokoro": "mlx-kokoro",
         "mlx-csm": "mlx-csm",
+        "audio8-onnx": "audio8-tts",
     }
 
     # Group aliases accepted by CLI/API model-management commands.
@@ -56,6 +57,8 @@ class ModelRegistry:
         "chatterbox": "chatterbox",
         "mlx": "mlx-audio",
         "mlx-audio": "mlx-audio",
+        "audio8": "audio8-onnx",
+        "audio8-onnx": "audio8-onnx",
     }
 
     # Default model definitions
@@ -100,6 +103,14 @@ class ModelRegistry:
             description="Voice cloning model optimized for Apple Silicon. High quality speech synthesis.",
             model_path_checker="mlx-community/csm-1b",
         ),
+        ModelInfo(
+            id="audio8-tts",
+            engine="audio8-onnx",
+            name="Audio8 TTS (1B)",
+            size_mb=2000,
+            description="High-quality voice cloning with Audio8 ONNX model. Supports reference audio voice cloning.",
+            model_path_checker="Audio8/audio8-TTS-0.1B-ONNX-INT8",
+        ),
     ]
 
     def __init__(self):
@@ -131,6 +142,8 @@ class ModelRegistry:
         self._cache_dirs["chatterbox"] = hf_cache
         # MLX Audio also uses HuggingFace hub cache
         self._cache_dirs["mlx-audio"] = hf_cache
+        # Audio8 also uses HuggingFace hub cache
+        self._cache_dirs["audio8-onnx"] = hf_cache
 
     def get_cache_dir(self, engine: str) -> Path:
         """Get cache directory for an engine."""
@@ -212,6 +225,12 @@ class ModelRegistry:
 
         elif model.engine == "mlx-audio":
             # MLX Audio uses HuggingFace hub format
+            hub_path = cache_dir / f"models--{model.model_path_checker.replace('/', '--')}"
+            if hub_path.exists():
+                return True, hub_path
+
+        elif model.engine == "audio8-onnx":
+            # Audio8 uses HuggingFace hub format
             hub_path = cache_dir / f"models--{model.model_path_checker.replace('/', '--')}"
             if hub_path.exists():
                 return True, hub_path
