@@ -279,7 +279,9 @@ class VoiceCloningApp(QMainWindow):
         self._stage_label = StyledLabel("", role="info")
         self._stage_label.setAccessibleName("Generation stage")
         self._stage_label.setWordWrap(True)
-        self._stage_label.setStyleSheet(self._stage_label.styleSheet() + "QLabel { font-size: 14px; font-weight: bold; }")
+        self._stage_label.setStyleSheet(
+            self._stage_label.styleSheet() + "QLabel { font-size: 14px; font-weight: bold; }"
+        )
         self._stage_label.hide()
         layout.addWidget(self._stage_label)
 

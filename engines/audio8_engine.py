@@ -125,6 +125,7 @@ class Audio8Engine(TTSEngineBase):
             logger.info("Loading Audio8 processor...")
             try:
                 import glob
+
                 from transformers import PreTrainedTokenizerFast
 
                 _ = self._get_model_path()  # validate model is installed
@@ -146,9 +147,7 @@ class Audio8Engine(TTSEngineBase):
                             tokenizer_file = str(matches[0])
 
                 if tokenizer_file is None:
-                    raise FileNotFoundError(
-                        "tokenizer.json not found in model snapshot"
-                    )
+                    raise FileNotFoundError("tokenizer.json not found in model snapshot")
 
                 # Load as a fast tokenizer directly — avoids the broken
                 # AutoTokenizer path that requires the missing arktts
