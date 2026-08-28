@@ -61,9 +61,10 @@ class AudioPlaybackController:
             )
             return False
 
-        if self._current_audio and Path(self._current_audio).exists():
+        audio_path = self.current_audio
+        if audio_path and Path(audio_path).exists():
             pygame.mixer.music.stop()
-            pygame.mixer.music.load(self._current_audio)
+            pygame.mixer.music.load(audio_path)
             pygame.mixer.music.play()
             return True
         return False
@@ -78,7 +79,8 @@ class AudioPlaybackController:
         Returns:
             True if saved, False otherwise.
         """
-        if not self._current_audio:
+        audio_path = self.current_audio
+        if not audio_path:
             return False
 
         file_path, _ = ui_delegate.get_save_filename(f"cloned_voice_{uuid.uuid4().hex[:8]}.wav", "Wave Files (*.wav)")
@@ -86,7 +88,7 @@ class AudioPlaybackController:
             import shutil
 
             try:
-                shutil.copy2(self._current_audio, file_path)
+                shutil.copy2(audio_path, file_path)
                 return True
             except (OSError, shutil.Error) as e:
                 ui_delegate.critical("Save Error", f"Failed to save audio: {e}")
@@ -95,4 +97,4 @@ class AudioPlaybackController:
 
     def reset(self):
         """Reset the controller state."""
-        self._current_audio = None
+        self._current_audio_path = None

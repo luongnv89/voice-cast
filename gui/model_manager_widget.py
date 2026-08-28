@@ -182,25 +182,37 @@ class ModelCard(StyledCard):
 
     def _apply_name_style(self):
         palette = get_theme_manager().palette
-        self.name_label.setStyleSheet(f"""
+        self.name_label.set_role("primary")
+        self.name_label.setStyleSheet(
+            self.name_label.styleSheet()
+            + f"""
             font-size: {TYPOGRAPHY.size_lg}px;
             font-weight: bold;
             color: {palette.text_primary};
-        """)
+        """
+        )
 
     def _apply_details_style(self):
         palette = get_theme_manager().palette
-        self.details_label.setStyleSheet(f"""
+        self.details_label.set_role("muted")
+        self.details_label.setStyleSheet(
+            self.details_label.styleSheet()
+            + f"""
             font-size: {TYPOGRAPHY.size_sm}px;
             color: {palette.text_muted};
-        """)
+        """
+        )
 
     def _apply_speed_style(self):
         palette = get_theme_manager().palette
-        self.speed_label.setStyleSheet(f"""
+        self.speed_label.set_role("muted")
+        self.speed_label.setStyleSheet(
+            self.speed_label.styleSheet()
+            + f"""
             font-size: {TYPOGRAPHY.size_xs}px;
             color: {palette.text_muted};
-        """)
+        """
+        )
 
     def _update_status_label(self):
         if self.model.is_installed:
@@ -209,20 +221,11 @@ class ModelCard(StyledCard):
             self.status_label.set_status("warning", "Not installed")
 
     def _update_download_button(self):
-        palette = get_theme_manager().palette
         if self.model.is_installed:
             self.download_btn.setText("Installed")
             self.download_btn.setEnabled(False)
-            self.download_btn.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: {palette.bg_tertiary};
-                    color: {palette.success};
-                    border: 2px solid {palette.success};
-                    padding: {SPACING.sm}px {SPACING.md}px;
-                    border-radius: 4px;
-                    font-weight: bold;
-                }}
-            """)
+            self.download_btn.setToolTip("Model already installed")
+            self.download_btn.set_variant("secondary")
         else:
             self.download_btn.setText("Download")
             self.download_btn.setEnabled(True)
