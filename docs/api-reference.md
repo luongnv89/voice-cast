@@ -138,8 +138,10 @@ say(
     save_audio: bool = False,
     output_file: str | None = None,
     speed: float = 1.0,
+    chunk_size: int | None = None,
+    silence_duration: int = 200,
     **kwargs
-) -> None
+) -> str | None
 ```
 
 Convert text to speech using the configured engine.
@@ -154,7 +156,20 @@ Convert text to speech using the configured engine.
 | `save_audio` | `bool` | `False` | Save audio to file |
 | `output_file` | `str` | Auto-generated | Output file path |
 | `speed` | `float` | `1.0` | Playback speed multiplier |
+| `chunk_size` | `int \| None` | `None` | Maximum characters per synthesis chunk. Chunking only engages when the text is longer than this value |
+| `silence_duration` | `int` | `200` | Silence between consecutive chunks, in **milliseconds**. Chunked path only; `0` or less inserts no silence |
 | `**kwargs` | `dict` | `{}` | Engine-specific parameters |
+
+**Returns:** the path to the written WAV file when `save_audio=True`, otherwise `None`.
+
+**Chunked synthesis:** when `chunk_size` is set and the text exceeds it, the
+text is split on sentence boundaries (`utils.split_into_chunks`), each chunk is
+synthesized separately, and the results are concatenated with
+`silence_duration` ms of silence between consecutive chunks — no leading or
+trailing padding. Text at or below `chunk_size` is synthesized in a single
+engine call with the original unmodified string, identical to the behavior
+without `chunk_size`. A `RuntimeError` is raised if the engine returns
+different sample rates for different chunks.
 
 **Engine-specific kwargs:**
 
