@@ -7,6 +7,16 @@
 - `utils/text_chunker.split_into_chunks()`: split long text into
   sentence-boundary-respecting chunks up to a configurable character
   limit, for future use chunking text before TTS synthesis (#125).
+- `VoiceCloner.say()` and `VoiceCloner.generate()`: optional `chunk_size`
+  and `silence_duration` parameters. When `chunk_size` is set and the text is
+  longer than it, the text is split on sentence boundaries, synthesized chunk
+  by chunk, and the chunks are concatenated with `silence_duration`
+  milliseconds of silence between them (default 200 ms, between chunks only,
+  no leading or trailing pad). Invalid chunking values are rejected. Shorter
+  texts are still synthesized in a single engine call with the original
+  unmodified text. `say()` returns the path to the written WAV file when
+  `save_audio=True`, and `None` otherwise; `generate()` always saves and
+  returns the final WAV path (#127, #128, #129).
 
 ### Fixed
 
