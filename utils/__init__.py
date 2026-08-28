@@ -5,9 +5,11 @@ from utils.platform_utils import (
     get_recommended_device,
     is_apple_silicon,
 )
+from utils.text_chunker import split_into_chunks
 
 __all__ = [
     "is_apple_silicon",
     "get_recommended_device",
     "get_platform_info",
+    "split_into_chunks",
 ]
