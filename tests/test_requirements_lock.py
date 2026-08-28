@@ -60,7 +60,7 @@ def test_every_entry_is_exactly_pinned():
 
 def test_all_runtime_deps_are_pinned():
     runtime_deps = _runtime_dep_names()
-    assert len(runtime_deps) >= 11, "expected the 11 declared runtime dependencies"
+    assert len(runtime_deps) >= 6, "expected the core runtime dependencies"
     pins = _pinned_names()
     missing = [name for name in runtime_deps if name not in pins]
     assert not missing, f"Runtime dependencies missing from requirements.txt: {missing}"

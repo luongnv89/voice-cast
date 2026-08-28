@@ -82,10 +82,10 @@
 
 ### Added
 
-- `transformers` declared as an explicit runtime dependency
-  (`transformers>=4.46.3`) in `pyproject.toml` — `voice_cloner.py` imports it
-  directly, so the GUI import chain no longer relies on a transitive Coqui
-  edge; lockfile regenerated (#54)
+- Engine dependencies are now explicit, mutually exclusive extras: the
+  maintained Coqui TTS fork with Transformers 5.16.x, or Chatterbox 0.1.7
+  with Transformers 5.2.0. The shared universal lock intentionally contains
+  only the core and dev dependencies (#121)
 - Dependency floors refreshed toward current stable for soundfile (`0.14.0`),
   PySide6 (`6.11.0`), rich (`15.0.0`), mlx (`0.32.0`), and numpy (`1.26.0`);
   ruff CI pin and dev-extra cap moved to `>=0.16.0,<0.17.0`, aligned with the
@@ -93,6 +93,9 @@
 
 ### Changed
 
+- Coqui and Chatterbox are no longer installed in the same environment because
+  their resolver constraints require incompatible Transformers versions;
+  installation guidance now documents separate engine environments (#121)
 - The CI security job can now fail: bandit runs blocking (no `|| true`) and
   `safety check` is replaced by a pip-audit scan of the fully pinned lockfile
   via `scripts/pip_audit_lockfile.sh` (`--no-deps --disable-pip`; no package
@@ -103,6 +106,9 @@
 
 ### Fixed
 
+- Chatterbox model-missing errors now remain deterministic even when a local
+  Hugging Face cache contains another variant, and MLX engine controls no
+  longer pass engine-only `variant` values to QWidget (#121)
 - The pre-commit dependency-vulnerability hook now executes when invoked: the
   skipped/unmaintained safety hook was replaced by a local `pip-audit-lockfile`
   hook targeting `requirements.txt` through the same shared wrapper (network

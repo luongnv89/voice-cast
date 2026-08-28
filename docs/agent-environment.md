@@ -11,10 +11,10 @@ is an agent that must set up, build, test, and lint without asking questions.
 |-------------|-------|--------|
 | Python | **3.10 – 3.12** (CI test matrix) | `.github/workflows/ci.yml` |
 | Python (lint/security jobs) | 3.11 | `.github/workflows/ci.yml` |
-| `requires-python` | `>=3.10` | `pyproject.toml` |
+| `requires-python` | `>=3.10,<3.13` | `pyproject.toml` |
 
-- The local interpreter on some dev machines (e.g. Python 3.14.x) is **untested**
-  against this project — prefer 3.10, 3.11, or 3.12.
+- The local interpreter on some dev machines (e.g. Python 3.14.x) is **unsupported**
+  by this project — use 3.10, 3.11, or 3.12.
 - Ruff targets `py310` (`pyproject.toml` → `[tool.ruff] target-version`).
 
 ### Virtual environment
@@ -28,8 +28,12 @@ python -m pip install --upgrade pip
 ### Installing dependencies
 
 ```bash
-# Full development environment (core + dev tools)
+# Full development environment (shared core + dev tools)
 pip install -e ".[dev]"
+
+# Optional engine environment — choose one, never both:
+pip install -e ".[coqui]"       # Coqui TTS fork, Transformers 5.16
+# pip install -e ".[chatterbox]" # Python 3.10–3.12, Transformers 5.2
 
 # Minimal environment sufficient for the test suite (what CI does)
 pip install sounddevice soundfile rich numpy
@@ -45,11 +49,12 @@ import state itself. You do not need the ML stack to run tests.
 
 ### Bootstrapping from the lockfile (proven)
 
-The lockfile pins runtime **and dev** tooling (`pytest`, `pytest-cov`, `ruff`,
-`bandit`, `pre-commit`), so one install gives you everything the commands of
-record below need. Verified end-to-end on a clean venv (Python 3.11, Linux
-x86_64): `pip install -r requirements.txt -e . && pytest tests/ -v --tb=short`
-→ 106 passed.
+The lockfile pins the shared runtime **and dev** tooling (`pytest`,
+`pytest-cov`, `ruff`, `bandit`, `pre-commit`), so one install gives you
+everything the commands of record below need. Engine extras are intentionally
+not included because Coqui and Chatterbox require incompatible Transformers
+major versions. Install one engine extra in a dedicated environment when
+running that engine.
 
 ```bash
 python3.11 -m venv .venv
@@ -61,19 +66,17 @@ pytest tests/ -v --tb=short
 Gotchas discovered during that verification:
 
 - **Pin the interpreter to 3.10–3.12 explicitly.** Dev-machine defaults can be
-  Python 3.14 (untested); the lockfile resolves its `< '3.13'` branch only on
-  older interpreters. Use `python3.11`/`python3.12`, not bare `python3`.
-- **Linux x86_64 pulls CUDA torch wheels.** The pinned `torch==2.6.0` brings
-  the NVIDIA CUDA-12 dependency stack (~2.5 GB download, ~8 GB installed). CI
-  dodges this with the minimal `--no-deps` install above; local full installs
-  should just expect the size (or pre-seed a CPU-only torch wheel).
-- **Regenerate with `--extra dev`, never `--all-extras`.**
+  Python 3.14 (unsupported); the project declares `<3.13`. Use
+  `python3.11`/`python3.12`, not bare `python3`.
+- **Engine extras are mutually exclusive.** The supported Coqui TTS fork uses
+  Transformers 5.16 and Chatterbox 0.1.7 uses `transformers==5.2.0` on Python
+  3.10–3.12.
+  Use separate virtual environments; there is deliberately no `all` extra.
+- **Regenerate the shared lock with `--extra dev`.**
   `uv pip compile pyproject.toml --universal --extra dev -o requirements.txt`
-  works; `--all-extras` cannot produce a universal solution because the
-  darwin-only `mlx` extra conflicts with `chatterbox-tts`' per-Python
-  `transformers` pins on the Python ≥ 3.13 split. The dev extra caps
-  `ruff < 0.17` on purpose — that is the range the CI lint job uses, so the
-  locked formatter never disagrees with CI.
+  excludes engine extras by design. The dev extra caps `ruff < 0.17` on
+  purpose — that is the range the CI lint job uses, so the locked formatter
+  never disagrees with CI.
 - **Headless Qt needs the offscreen platform.** PySide6 ships in the lock, so
   the engine-control widget tests actually execute locally (20 tests that CI
   skips via `pytest.importorskip("PySide6")` because its minimal install never
@@ -90,11 +93,16 @@ Gotchas discovered during that verification:
 
 Both are installed by the CI test job (`.github/workflows/ci.yml`).
 
-### torch / torchaudio
+### Engine dependencies
 
-- Core dependency: `torch>=2.5.1`, `torchaudio>=2.5.1`.
-- Plain `pip install` gets CPU wheels. For NVIDIA GPUs, install from the PyTorch
-  CUDA index instead (https://pytorch.org → pick your CUDA version).
+- The shared install does not include PyTorch or Transformers.
+- Coqui: `pip install -e ".[coqui]"` in Python 3.10–3.12; this selects
+  `coqui-tts==0.27.5`, PyTorch 2.5–2.10, and Transformers 5.16.x.
+- Chatterbox: `pip install -e ".[chatterbox]"` in Python 3.10–3.12; this
+  selects Chatterbox 0.1.7, PyTorch 2.6.0, and Transformers 5.2.0.
+- For CPU wheels, install matching PyTorch packages from the CPU index before
+  the engine extra. For NVIDIA GPUs, use the appropriate PyTorch CUDA index
+  instead (https://pytorch.org). Never combine the two engine extras.
 - Optional MLX backend (Apple Silicon only): `pip install -e ".[mlx]"`.
 
 ### PySide6 (GUI)
@@ -152,13 +160,15 @@ and security jobs.
   minimal `--no-deps` install above, so heavyweight engines stay unexercised
   there and PySide6-dependent tests skip. Full-lock local environments are the
   ones that exercise them (see the bootstrap section above).
-- `requirements.txt` remains the fully pinned universal lock of
-  `pyproject.toml` (+ the `dev` extra), consumed by the CI *security* job and
-  the pre-commit pip-audit hook. Regenerate it whenever dependencies change
-  (`tests/test_requirements_lock.py` enforces sync). The pip-audit baseline
-  lives in `scripts/pip_audit_lockfile.sh`: every advisory known at baseline
-  time is an explicit `--ignore-vuln`, and any advisory outside that list fails
-  CI — remove entries by upgrading the affected package, not by re-baselining.
+- `requirements.txt` is the fully pinned universal lock of the shared
+  `pyproject.toml` dependencies plus `dev`; it is consumed by the CI security
+  job and the pre-commit pip-audit hook. Regenerate it whenever those
+  dependencies change (`tests/test_requirements_lock.py` enforces sync).
+  Engine extras are resolved and audited in their own virtual environments and
+  must not be combined. The pip-audit baseline lives in
+  `scripts/pip_audit_lockfile.sh`: every advisory known at baseline time is an
+  explicit `--ignore-vuln`, and any advisory outside that list fails CI — remove
+  entries by upgrading the affected package, not by re-baselining.
 
 ## See also
 

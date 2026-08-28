@@ -4,22 +4,32 @@ version = "0.3.0"
 description = "Your words, any voice - Voice cloning and text-to-speech application"
 readme = "README.md"
 license = { text = "MIT" }
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.13"
 dependencies = [
-    "torch>=2.5.1",
-    "torchaudio>=2.5.1",
-    "TTS>=0.22.0",
-    "chatterbox-tts>=0.1.0",
     "sounddevice>=0.5.1",
     "soundfile>=0.14.0",
     "PySide6>=6.11.0",
     "rich>=15.0.0",
     "pygame>=2.5.0",
     "numpy>=1.26.0",
-    "transformers>=4.46.3,<5.0.0",
 ]
 
 [project.optional-dependencies]
+# These engines cannot share one environment: Coqui TTS requires Transformers
+# 4.x while Chatterbox 0.1.7 requires Transformers 5.2.0. Install one extra
+# per virtual environment; do not combine them.
+coqui = [
+    "coqui-tts==0.27.5",
+    "torch>=2.5.1,<2.11",
+    "torchaudio>=2.5.1,<2.11",
+    "transformers>=5.16.1,<5.17",
+]
+chatterbox = [
+    "chatterbox-tts==0.1.7",
+    "torch==2.6.0",
+    "torchaudio==2.6.0",
+    "transformers==5.2.0",
+]
 mlx = [
     "mlx>=0.32.0; platform_machine == 'arm64' and sys_platform == 'darwin'",
     "mlx-audio>=0.1.0; platform_machine == 'arm64' and sys_platform == 'darwin'",
