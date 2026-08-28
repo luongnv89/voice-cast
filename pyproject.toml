@@ -16,7 +16,7 @@ dependencies = [
     "rich>=15.0.0",
     "pygame>=2.5.0",
     "numpy>=1.26.0",
-    "transformers>=4.46.3",
+    "transformers>=4.46.3,<5.0.0",
 ]
 
 [project.optional-dependencies]

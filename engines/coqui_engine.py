@@ -5,12 +5,24 @@ from typing import Any
 
 import numpy as np
 import soundfile as sf
+import torch
 
 from models.exceptions import ModelNotInstalledError
 from models.model_registry import ModelRegistry, get_registry
 from tts_engine_base import TTSEngineBase
 
 logger = logging.getLogger("voice_cloner.coqui")
+
+# Patch torch.load to handle PyTorch 2.6+ weights_only default change.
+# TTS 0.22.0 checkpoints contain custom types not allowed by default.
+_original_torch_load = torch.load
+
+def _patched_torch_load(*args, **kwargs):
+    if "weights_only" not in kwargs:
+        kwargs["weights_only"] = False
+    return _original_torch_load(*args, **kwargs)
+
+torch.load = _patched_torch_load
 
 # Model ID for registry lookup
 COQUI_MODEL_ID = "coqui-xtts-v2"

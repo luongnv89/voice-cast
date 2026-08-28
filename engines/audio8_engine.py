@@ -129,12 +129,17 @@ class Audio8Engine(TTSEngineBase):
                 _ = self._get_model_path()  # validate model is installed
                 install_path = self._registry.get_install_path(self._model_id)
                 cache_dir = self._registry.get_cache_dir("audio8-onnx")
-                # Snapshot-aware tokenizer resolution: snapshot dir contains
-                # tokenizer/ or tokenizer assets at root; fall back to rglob.
+                # Snapshot-aware tokenizer resolution: the audio8-TTS-0.1B-ONNX-INT8
+                # repo stores config.json at the snapshot root (not inside
+                # tokenizer/).  AutoTokenizer.from_pretrained needs config.json
+                # to identify the model type, so we point at the root.
                 tokenizer_path: Path | None = None
                 if install_path is not None:
                     base = Path(install_path)
-                    if (base / "tokenizer").exists():
+                    # Prefer the snapshot root which contains config.json
+                    if (base / "config.json").exists():
+                        tokenizer_path = base
+                    elif (base / "tokenizer").exists():
                         tokenizer_path = base / "tokenizer"
                     elif (base / "tokenizer.json").exists() or any(base.rglob("tokenizer.json")):
                         # HF repo may store tokenizer at root
@@ -154,7 +159,7 @@ class Audio8Engine(TTSEngineBase):
                     str(tokenizer_path),
                     cache_dir=str(cache_dir),
                     local_files_only=True,
-                    trust_remote_code=False,
+                    trust_remote_code=True,
                 )
                 # The audio8-TTS-0.1B-ONNX-INT8 tokenizer ships with no
                 # special-token wiring: config.json declares pad_token_id=0

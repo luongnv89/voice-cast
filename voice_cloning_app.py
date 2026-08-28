@@ -276,9 +276,10 @@ class VoiceCloningApp(QMainWindow):
         self.progress_bar.hide()
         layout.addWidget(self.progress_bar)
 
-        self._stage_label = StyledLabel("", role="secondary")
+        self._stage_label = StyledLabel("", role="info")
         self._stage_label.setAccessibleName("Generation stage")
         self._stage_label.setWordWrap(True)
+        self._stage_label.setStyleSheet(self._stage_label.styleSheet() + "QLabel { font-size: 14px; font-weight: bold; }")
         self._stage_label.hide()
         layout.addWidget(self._stage_label)
 
@@ -379,6 +380,9 @@ class VoiceCloningApp(QMainWindow):
 
     def question(self, title: str, message: str, buttons, default_button):
         return QMessageBox.question(self, title, message, buttons, default_button)
+
+    def info(self, title: str, message: str):
+        QMessageBox.information(self, title, message)
 
     def disable_generate(self):
         self.btn_generate.setEnabled(False)
