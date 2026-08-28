@@ -164,6 +164,48 @@ class VoiceCloner:
         engine_name = f"chatterbox-{variant}"
         return cls(speaker_wav=speaker_wav, engine=engine_name, device=device)
 
+    @staticmethod
+    def _validate_chunking_parameters(chunk_size: int | None, silence_duration: int) -> None:
+        """Validate the public chunking controls before generation starts."""
+        if chunk_size is not None:
+            if isinstance(chunk_size, bool) or not isinstance(chunk_size, int):
+                raise TypeError("chunk_size must be a positive integer or None")
+            if chunk_size <= 0:
+                raise ValueError(f"chunk_size must be a positive integer, got {chunk_size}")
+
+        if isinstance(silence_duration, bool) or not isinstance(silence_duration, int):
+            raise TypeError("silence_duration must be a non-negative integer")
+        if silence_duration < 0:
+            raise ValueError(f"silence_duration must be a non-negative integer, got {silence_duration}")
+
+    def generate(
+        self,
+        text: str,
+        language: str = "en",
+        chunk_size: int | None = None,
+        silence_duration: int = 200,
+        output_file: str | None = None,
+        **kwargs,
+    ) -> str:
+        """Synthesize text, save the WAV file, and return its path.
+
+        This convenience API always saves the generated audio and never plays
+        it. Chunking uses the same controls as :meth:`say`.
+        """
+        output_path = self.say(
+            text,
+            language=language,
+            play_audio=False,
+            save_audio=True,
+            output_file=output_file,
+            chunk_size=chunk_size,
+            silence_duration=silence_duration,
+            **kwargs,
+        )
+        if output_path is None:  # pragma: no cover - save_audio=True guarantees a path
+            raise RuntimeError("Audio generation did not produce an output path")
+        return output_path
+
     def say(
         self,
         text_to_voice: str,
@@ -191,13 +233,14 @@ class VoiceCloner:
                 each chunk is synthesized separately.
             silence_duration: Silence inserted between consecutive chunks, in
                 **milliseconds** (default 200). Only takes effect on the
-                chunked path; values of 0 or less insert no silence.
+                chunked path; 0 inserts no silence.
             **kwargs: Engine-specific parameters (e.g., cfg_weight for Chatterbox).
 
         Returns:
             The path to the written WAV file when ``save_audio`` is True,
             otherwise None.
         """
+        self._validate_chunking_parameters(chunk_size, silence_duration)
         logger.info(f"Generating speech for: '{text_to_voice[:50]}...' [{language}]")
 
         # Determine output file
@@ -273,10 +316,13 @@ class VoiceCloner:
 
         logger.info(f"Synthesizing {len(chunks)} chunks (chunk_size={chunk_size})")
 
-        audio_chunks = []
-        sample_rate = None
+        audio_chunks: list[np.ndarray] = []
+        sample_rate: int | None = None
         for index, chunk in enumerate(chunks):
             chunk_audio, chunk_rate = self.engine.generate(text=chunk, language=language, **kwargs)
+            chunk_audio = np.asarray(chunk_audio)
+            if chunk_audio.ndim == 0:
+                raise ValueError(f"Engine returned scalar audio for chunk {index}; expected an array of samples.")
             if sample_rate is None:
                 sample_rate = chunk_rate
             elif chunk_rate != sample_rate:
@@ -285,10 +331,18 @@ class VoiceCloner:
                     f"chunk 0 produced {sample_rate} Hz but chunk {index} produced "
                     f"{chunk_rate} Hz. Refusing to concatenate mismatched audio."
                 )
+            if audio_chunks and chunk_audio.shape[1:] != audio_chunks[0].shape[1:]:
+                raise RuntimeError(
+                    f"Engine returned inconsistent audio shapes across chunks: "
+                    f"chunk 0 has trailing shape {audio_chunks[0].shape[1:]} but chunk {index} "
+                    f"has {chunk_audio.shape[1:]}. Refusing to concatenate mismatched audio."
+                )
             audio_chunks.append(chunk_audio)
 
         if silence_duration > 0 and len(audio_chunks) > 1:
-            silence = np.zeros(int(sample_rate * silence_duration / 1000), dtype=audio_chunks[0].dtype)
+            silence_samples = int(sample_rate * silence_duration / 1000)
+            silence_shape = (silence_samples, *audio_chunks[0].shape[1:])
+            silence = np.zeros(silence_shape, dtype=audio_chunks[0].dtype)
             padded = []
             for index, chunk_audio in enumerate(audio_chunks):
                 if index:

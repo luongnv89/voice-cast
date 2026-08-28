@@ -128,6 +128,31 @@ cloner = VoiceCloner.from_chatterbox(speaker_wav="./voice-samples/speaker.wav", 
 
 ### Methods
 
+#### `generate()`
+
+```python
+generate(
+    text: str,
+    language: str = "en",
+    chunk_size: int | None = None,
+    silence_duration: int = 200,
+    output_file: str | None = None,
+    **kwargs
+) -> str
+```
+
+Synthesize text, save the resulting WAV file, and return its path. This method
+never plays audio. When `chunk_size` is set and the text is longer than the
+limit, sentences are synthesized separately and joined with `silence_duration`
+milliseconds of zero-filled audio between chunks. The default padding is 200
+ms, and padding is never added before the first or after the last chunk.
+
+`chunk_size` must be `None` or a positive integer. `silence_duration` must be a
+non-negative integer in milliseconds. Text at or below `chunk_size` is sent to
+the engine once without modification.
+
+---
+
 #### `say()`
 
 ```python
@@ -157,7 +182,7 @@ Convert text to speech using the configured engine.
 | `output_file` | `str` | Auto-generated | Output file path |
 | `speed` | `float` | `1.0` | Playback speed multiplier |
 | `chunk_size` | `int \| None` | `None` | Maximum characters per synthesis chunk. Chunking only engages when the text is longer than this value |
-| `silence_duration` | `int` | `200` | Silence between consecutive chunks, in **milliseconds**. Chunked path only; `0` or less inserts no silence |
+| `silence_duration` | `int` | `200` | Silence between consecutive chunks, in **milliseconds**. Chunked path only; `0` inserts no silence; negative values are rejected |
 | `**kwargs` | `dict` | `{}` | Engine-specific parameters |
 
 **Returns:** the path to the written WAV file when `save_audio=True`, otherwise `None`.
@@ -166,7 +191,7 @@ Convert text to speech using the configured engine.
 text is split on sentence boundaries (`utils.split_into_chunks`), each chunk is
 synthesized separately, and the results are concatenated with
 `silence_duration` ms of silence between consecutive chunks — no leading or
-trailing padding. Text at or below `chunk_size` is synthesized in a single
+trailing padding. Negative `silence_duration` values are rejected. Text at or below `chunk_size` is synthesized in a single
 engine call with the original unmodified string, identical to the behavior
 without `chunk_size`. A `RuntimeError` is raised if the engine returns
 different sample rates for different chunks.
