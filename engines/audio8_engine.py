@@ -470,7 +470,9 @@ class Audio8Engine(TTSEngineBase):
         t0 = time.perf_counter()
         frames = self._iter_arktts_frames(slow, fast, prompt, manifest, kwargs)
         elapsed = time.perf_counter() - t0
-        logger.info(f"  Autoregressive generation completed: {len(frames)} frames in {elapsed:.2f}s ({elapsed/max(len(frames),1):.3f}s/frame)")
+        logger.info(
+            f"  Autoregressive generation completed: {len(frames)} frames in {elapsed:.2f}s ({elapsed / max(len(frames), 1):.3f}s/frame)"
+        )
         if not frames:
             raise RuntimeError("Audio8 model produced no codec frames.")
         generated = np.stack(frames, axis=1)  # [num_codebooks, T]
@@ -736,7 +738,7 @@ class Audio8Engine(TTSEngineBase):
             if (pos + 1) % 10 == 0 or pos == prompt_len - 1:
                 logger.debug(f"    Prefill progress: {pos + 1}/{prompt_len}")
         elapsed = time.perf_counter() - t0
-        logger.info(f"  Prefill completed in {elapsed:.2f}s ({elapsed/prompt_len:.3f}s/token)")
+        logger.info(f"  Prefill completed in {elapsed:.2f}s ({elapsed / prompt_len:.3f}s/token)")
 
         previous: list[int] = []
         frames: list[np.ndarray] = []
