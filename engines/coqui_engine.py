@@ -1,16 +1,47 @@
 import logging
 import os
 import tempfile
+from contextlib import contextmanager
+from contextvars import ContextVar
+from threading import RLock
 from typing import Any
 
 import numpy as np
 import soundfile as sf
+import torch
 
 from models.exceptions import ModelNotInstalledError
 from models.model_registry import ModelRegistry, get_registry
 from tts_engine_base import TTSEngineBase
 
 logger = logging.getLogger("voice_cloner.coqui")
+
+# TTS 0.22.0 checkpoints contain custom types that PyTorch 2.6+ rejects when
+# ``weights_only`` is omitted. Keep the temporary compatibility patch scoped to
+# model construction so other callers retain torch.load's safe default.
+_COQUI_TORCH_LOAD_LOCK = RLock()
+_COQUI_TORCH_LOAD_ACTIVE: ContextVar[bool] = ContextVar("_COQUI_TORCH_LOAD_ACTIVE", default=False)
+
+
+@contextmanager
+def _coqui_torch_load_compatibility():
+    """Temporarily allow legacy Coqui checkpoints to be unpickled."""
+    with _COQUI_TORCH_LOAD_LOCK:
+        original_torch_load = torch.load
+
+        def patched_torch_load(*args, **kwargs):
+            if _COQUI_TORCH_LOAD_ACTIVE.get():
+                kwargs["weights_only"] = False
+            return original_torch_load(*args, **kwargs)
+
+        token = _COQUI_TORCH_LOAD_ACTIVE.set(True)
+        torch.load = patched_torch_load
+        try:
+            yield
+        finally:
+            torch.load = original_torch_load
+            _COQUI_TORCH_LOAD_ACTIVE.reset(token)
+
 
 # Model ID for registry lookup
 COQUI_MODEL_ID = "coqui-xtts-v2"
@@ -92,7 +123,8 @@ class CoquiEngine(TTSEngineBase):
             from TTS.api import TTS
 
             logger.info(f"Loading Coqui TTS model: {self.model_name}")
-            self._tts = TTS(model_name=self.model_name, progress_bar=True, gpu=(self.device == "cuda"))
+            with _coqui_torch_load_compatibility():
+                self._tts = TTS(model_name=self.model_name, progress_bar=True, gpu=(self.device == "cuda"))
             logger.info("Coqui TTS model loaded successfully")
         return self._tts
 

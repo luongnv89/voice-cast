@@ -8,16 +8,19 @@ Extracts the voice cloning generation flow from the main application window:
 """
 
 import contextlib
+import logging
 import shutil
 import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import QObject, Qt, QThread, Signal, Slot
 from PySide6.QtWidgets import QMessageBox
 
 from voice_cloner import VoiceCloner
+
+logger = logging.getLogger("voice_cloner.gui.clone_flow")
 
 
 class VoiceClonerCache:
@@ -73,7 +76,7 @@ class VoiceClonerCache:
 class CloneThread(QThread):
     """Thread for running TTS generation without blocking the UI."""
 
-    finished = Signal(str, str)
+    completed = Signal(str, str)
     error_occurred = Signal(str)
     stage_changed = Signal(str)
 
@@ -84,6 +87,7 @@ class CloneThread(QThread):
         engine_name: str,
         engine_params: dict,
         voice_cloner: VoiceCloner | None = None,
+        temp_voice_file: str | None = None,
     ):
         super().__init__()
         self.text = text
@@ -91,23 +95,62 @@ class CloneThread(QThread):
         self.engine_name = engine_name
         self.engine_params = engine_params
         self._voice_cloner = voice_cloner
-        self.output_path = None
+        self.temp_voice_file = temp_voice_file
+        self.output_path: Path | None = self._allocate_output_path()
+        self.output_owned = False
+        self.keep_output = False
+        self.outcome: str | None = None
+
+    def _allocate_output_path(self) -> Path:
+        """Return a readable, unused output path for this generation run."""
+        output_dir = Path(tempfile.gettempdir()) / "voice_cloning"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        run_id = uuid.uuid4().hex
+        candidate = output_dir / f"{self.engine_name}_{timestamp}_{run_id}.wav"
+        suffix = 1
+        while candidate.exists():
+            candidate = output_dir / f"{self.engine_name}_{timestamp}_{run_id}_{suffix}.wav"
+            suffix += 1
+        return candidate
+
+    def _prepare_output_path(self):
+        """Avoid a path claimed after construction before the backend writes."""
+        if self.output_path is None or self.output_path.exists():
+            self.output_path = self._allocate_output_path()
+        self.output_owned = False
+
+    def _record_output_ownership(self):
+        """Record whether this run created its own output file."""
+        if self.output_path is not None and self.output_path.exists():
+            self.output_owned = True
+
+    def _discard_output(self):
+        """Remove only an output file created by this run."""
+        if self.output_owned and self.output_path is not None:
+            with contextlib.suppress(OSError):
+                self.output_path.unlink(missing_ok=True)
+            self.output_owned = False
 
     def run(self):
         try:
+            if self.isInterruptionRequested():
+                self.outcome = "cancelled"
+                return
+
             # Create temporary output directory
             output_dir = Path(tempfile.gettempdir()) / "voice_cloning"
             output_dir.mkdir(exist_ok=True)
-
-            # Use engine name + timestamp for readable filenames
-            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            self.output_path = output_dir / f"{self.engine_name}_{ts}.wav"
+            self._prepare_output_path()
 
             # Use cached cloner or create a new one
             voice_cloner = self._voice_cloner
             if voice_cloner is None:
                 self.stage_changed.emit("Loading model...")
                 voice_cloner = VoiceCloner(speaker_wav=self.voice_path, engine=self.engine_name)
+
+            if self.isInterruptionRequested():
+                self.outcome = "cancelled"
+                return
 
             # Generate audio
             self.stage_changed.emit("Synthesizing...")
@@ -118,17 +161,28 @@ class CloneThread(QThread):
                 output_file=str(self.output_path),
                 **self.engine_params,
             )
-            self.finished.emit(str(self.output_path), self.text)
+            self._record_output_ownership()
+            if self.isInterruptionRequested():
+                self.outcome = "cancelled"
+                return
+            self.outcome = "completed"
+            self.completed.emit(str(self.output_path), self.text)
         except Exception as e:
-            self.error_occurred.emit(str(e))
+            self._record_output_ownership()
+            interrupted = self.isInterruptionRequested()
+            self.outcome = "cancelled" if interrupted else "failed"
+            if not interrupted:
+                self.error_occurred.emit(str(e))
 
 
-class CloneFlowController:
+class CloneFlowController(QObject):
     """Manages the clone generation lifecycle.
 
     Coordinates UI state, validation, thread management, and result handling
     for the voice cloning flow. Delegated to by VoiceCloningApp.
     """
+
+    worker_finished = Signal()
 
     def __init__(self, ui_delegate):
         """Initialize the controller.
@@ -160,25 +214,39 @@ class CloneFlowController:
                 - switch_to_model_manager()
                 - is_thread_running() -> bool
         """
+        super().__init__()
         self._ui = ui_delegate
         self._thread = None
+        self._shutting_down = False
+        self._thread_shutdown_requested = False
         self._temp_voice_file = None
         self._cloner_cache = VoiceClonerCache()
 
     @property
     def is_running(self) -> bool:
-        """Whether a generation is currently in progress."""
+        """Whether a generation is currently executing."""
         return self._thread is not None and self._thread.isRunning()
 
-    def terminate(self):
-        """Terminate the generation thread if running.
+    @property
+    def has_worker(self) -> bool:
+        """Whether a worker remains owned until its native thread has finished."""
+        return self._thread is not None
 
-        Blocks until the thread has finished terminating.
+    def terminate(self):
+        """Request cooperative shutdown without blocking the GUI thread.
+
+        The worker may be inside a third-party model loader, so forcibly
+        terminating it could skip cleanup in scoped compatibility contexts.
+        Resource cleanup is deferred until the worker's native ``finished``
+        signal arrives.
         """
-        if self._thread is not None and self._thread.isRunning():
-            self._thread.terminate()
-            self._thread.wait(5000)  # Wait up to 5 seconds
-            self._thread = None
+        self._shutting_down = True
+        thread = self._thread
+        if thread is None or self._thread_shutdown_requested:
+            return
+
+        self._thread_shutdown_requested = True
+        thread.requestInterruption()
 
     def start(self) -> bool:
         """Start the voice cloning process.
@@ -197,11 +265,11 @@ class CloneFlowController:
         # Validate text input
         text = self._ui.get_text_input().strip()
         if not text:
-            self._ui.warning(self, "Missing Text", "Please enter text to generate audio.")
+            self._ui.warning("Missing Text", "Please enter text to generate audio.")
             return False
 
-        # Check if a thread is already running
-        if self.is_running:
+        # Keep the native worker reference until its finished signal is handled.
+        if self.has_worker:
             self._ui.warning(
                 "Generation In Progress",
                 "Please wait for the current generation to complete.",
@@ -241,6 +309,7 @@ class CloneFlowController:
                 return False
 
         # Disable UI during processing
+        self._shutting_down = False
         self._ui.disable_generate()
         self._ui.set_generate_text("Generating audio...")
         self._ui.hide_play_save()
@@ -260,27 +329,95 @@ class CloneFlowController:
             engine_name=engine_name,
             engine_params=engine_params,
             voice_cloner=voice_cloner,
+            temp_voice_file=self._temp_voice_file,
         )
-        self._thread.finished.connect(self._on_finished)
-        self._thread.error_occurred.connect(self._on_error)
-        self._thread.stage_changed.connect(self._on_stage_changed)
+        self._connect_thread_signals(self._thread)
         self._thread.start()
         return True
 
+    @staticmethod
+    def _connect_queued(signal, slot):
+        signal.connect(slot, Qt.ConnectionType.QueuedConnection)
+
+    def _connect_thread_signals(self, thread: CloneThread):
+        """Connect worker signals to GUI-thread handlers."""
+        self._connect_queued(
+            thread.completed,
+            lambda output_path, text, worker=thread: self._handle_finished(worker, output_path, text),
+        )
+        self._connect_queued(
+            thread.error_occurred,
+            lambda message, worker=thread: self._handle_error(worker, message),
+        )
+        self._connect_queued(
+            thread.stage_changed,
+            lambda stage, worker=thread: self._handle_stage_changed(worker, stage),
+        )
+        self._connect_queued(thread.finished, lambda: self._on_thread_finished(thread))
+
+    def _handle_stage_changed(self, thread: CloneThread, stage: str):
+        """Ignore stage updates from stale or shutting-down workers."""
+        if thread is self._thread and not self._shutting_down:
+            self._on_stage_changed(stage)
+
+    def _handle_finished(self, thread: CloneThread, output_path: str, text: str):
+        """Handle completion only for the current, non-shutting-down worker."""
+        if thread is not self._thread or self._shutting_down:
+            return
+        thread.keep_output = True
+        self._on_finished(output_path, text)
+
+    def _handle_error(self, thread: CloneThread, message: str):
+        """Handle errors only for the current, non-shutting-down worker."""
+        if thread is not self._thread or self._shutting_down:
+            return
+        thread.keep_output = False
+        self._on_error(message)
+
+    def _on_thread_finished(self, thread: CloneThread):
+        """Clean run-owned resources after the native thread has stopped."""
+        if self._thread is not thread:
+            return
+
+        if not getattr(thread, "keep_output", False):
+            discard_output = getattr(thread, "_discard_output", None)
+            if discard_output is not None:
+                discard_output()
+        self._cleanup_temp(getattr(thread, "temp_voice_file", None))
+        self._thread = None
+        self._thread_shutdown_requested = False
+
+        delete_later = getattr(thread, "deleteLater", None)
+        if delete_later is not None:
+            with contextlib.suppress(RuntimeError):
+                delete_later()
+        self.worker_finished.emit()
+
+    @Slot(str)
     def _on_stage_changed(self, stage: str):
         """Handle stage change during generation."""
-        self._ui.set_stage_text(stage)
+        if not self._shutting_down:
+            self._ui.set_stage_text(stage)
 
+    @Slot(str, str)
     def _on_finished(self, output_path: str, text: str):
         """Handle successful generation completion."""
+        if self._shutting_down:
+            return
         self._ui.current_audio = output_path
-        self._cleanup_temp()
         self._reset_ui()
         self._ui.show_play_save()
+        self._ui.info(
+            "Generation Complete",
+            f"Audio generation completed.\n\nGenerated audio: {output_path}\n\n"
+            "Use Save Audio to choose where to save it.",
+        )
 
+    @Slot(str)
     def _on_error(self, message: str):
         """Handle generation error."""
-        self._cleanup_temp()
+        if self._shutting_down:
+            return
         self._reset_ui()
         self._ui.critical("Generation Error", f"Failed to generate audio:\n\n{message}")
 
@@ -292,12 +429,14 @@ class CloneFlowController:
         self._ui.enable_engine_combo()
         self._ui.hide_progress()
 
-    def _cleanup_temp(self):
-        """Clean up temporary voice file."""
-        if self._temp_voice_file:
+    def _cleanup_temp(self, temp_voice_file: str | None = None):
+        """Clean up the temporary voice file owned by a completed run."""
+        path = temp_voice_file if temp_voice_file is not None else self._temp_voice_file
+        if path:
             with contextlib.suppress(OSError):
-                Path(self._temp_voice_file).unlink(missing_ok=True)
-            self._temp_voice_file = None
+                Path(path).unlink(missing_ok=True)
+            if path == self._temp_voice_file:
+                self._temp_voice_file = None
 
     def engine_changed(self, engine_name: str):
         """Invalidate cloner cache when engine changes.

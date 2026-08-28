@@ -97,7 +97,11 @@ class TestEngineCheckpoints:
 
     @staticmethod
     def _make_engine(variant):
-        return ChatterboxEngine(speaker_wav="unused.wav", variant=variant)
+        # Keep the missing-model regression independent of a developer's
+        # Hugging Face cache, which may contain one of the checkpoints.
+        registry = MagicMock()
+        registry.is_installed.return_value = False
+        return ChatterboxEngine(speaker_wav="unused.wav", variant=variant, registry=registry)
 
     def _assert_variant_loads_backend(self, monkeypatch, model_id):
         record = []

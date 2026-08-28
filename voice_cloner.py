@@ -8,7 +8,6 @@ import sounddevice as sd
 import soundfile as sf
 from rich.console import Console
 from rich.logging import RichHandler
-from transformers import logging as transformers_logging
 
 from models import ModelDownloader, ModelInfo
 from models.download_progress import ProgressCallback
@@ -20,8 +19,18 @@ from tts_factory import TTSFactory, bootstrap_engines
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
-# Suppress specific warnings from Hugging Face Transformers
-transformers_logging.set_verbosity_error()
+
+def _configure_transformers_logging():
+    """Silence Transformers warnings when an engine extra is installed."""
+    try:
+        from transformers import logging as transformers_logging
+    except ImportError:
+        return
+    transformers_logging.set_verbosity_error()
+
+
+# Suppress specific warnings from Hugging Face Transformers when available.
+_configure_transformers_logging()
 
 # Set up logging with RichHandler
 logging.basicConfig(level=logging.INFO, format="%(message)s", handlers=[RichHandler(rich_tracebacks=True)])

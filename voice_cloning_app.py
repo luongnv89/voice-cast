@@ -8,7 +8,7 @@ import contextlib
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import Slot
+from PySide6.QtCore import QTimer, Slot
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
     QApplication,
@@ -59,6 +59,9 @@ class VoiceCloningApp(QMainWindow):
         # Extracted collaborators
         self._audio = AudioPlaybackController()
         self._clone_flow = CloneFlowController(self)
+        self._close_pending = False
+        self._close_retry_queued = False
+        self._clone_flow.worker_finished.connect(self._on_clone_worker_finished)
 
         self._setup_menu_bar()
         self._init_ui()
@@ -125,6 +128,16 @@ class VoiceCloningApp(QMainWindow):
     def _on_theme_changed(self, mode: ThemeMode):
         """Handle theme change."""
         self._update_theme_menu_state()
+        self._apply_stage_label_font()
+
+    def _apply_stage_label_font(self):
+        """Keep the generation stage label emphasized across theme changes."""
+        if not hasattr(self, "_stage_label"):
+            return
+        font = self._stage_label.font()
+        font.setBold(True)
+        font.setPixelSize(14)
+        self._stage_label.setFont(font)
 
     def _on_tab_changed(self, index: int):
         """Refresh model status when Model Manager tab is activated."""
@@ -136,10 +149,14 @@ class VoiceCloningApp(QMainWindow):
     # ------------------------------------------------------------------ #
 
     def closeEvent(self, event):
-        """Clean up resources when window closes."""
-        # Terminate any in-flight generation to prevent crash-on-exit
-        if self._clone_flow.is_running:
+        """Close only after any in-flight generation has exited naturally."""
+        if self._clone_flow.has_worker:
+            self._close_pending = True
+            event.ignore()
             self._clone_flow.terminate()
+            return
+
+        self._close_pending = False
 
         # Stop any playing audio
         if self._audio.audio_available:
@@ -157,6 +174,19 @@ class VoiceCloningApp(QMainWindow):
         self._cleanup_temp_files()
 
         super().closeEvent(event)
+
+    @Slot()
+    def _on_clone_worker_finished(self):
+        """Retry a close request once the generation worker is fully stopped."""
+        if not self._close_pending or self._clone_flow.has_worker or self._close_retry_queued:
+            return
+        self._close_retry_queued = True
+        QTimer.singleShot(0, self._retry_close)
+
+    def _retry_close(self):
+        self._close_retry_queued = False
+        if self._close_pending and not self._clone_flow.has_worker:
+            self.close()
 
     def _cleanup_temp_files(self):
         """Clean up temporary files."""
@@ -276,9 +306,10 @@ class VoiceCloningApp(QMainWindow):
         self.progress_bar.hide()
         layout.addWidget(self.progress_bar)
 
-        self._stage_label = StyledLabel("", role="secondary")
+        self._stage_label = StyledLabel("", role="info")
         self._stage_label.setAccessibleName("Generation stage")
         self._stage_label.setWordWrap(True)
+        self._apply_stage_label_font()
         self._stage_label.hide()
         layout.addWidget(self._stage_label)
 
@@ -380,6 +411,9 @@ class VoiceCloningApp(QMainWindow):
     def question(self, title: str, message: str, buttons, default_button):
         return QMessageBox.question(self, title, message, buttons, default_button)
 
+    def info(self, title: str, message: str):
+        QMessageBox.information(self, title, message)
+
     def disable_generate(self):
         self.btn_generate.setEnabled(False)
 
@@ -417,8 +451,9 @@ class VoiceCloningApp(QMainWindow):
         self._stage_label.hide()
 
     def set_stage_text(self, text: str):
-        """Set the generation stage text."""
+        """Set the generation stage text and accessible status."""
         self._stage_label.setText(text)
+        self._stage_label.setAccessibleName(f"Generation stage: {text}" if text else "Generation stage")
         self._stage_label.show()
 
     def get_text_input(self) -> str:

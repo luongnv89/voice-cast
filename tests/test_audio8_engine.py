@@ -278,14 +278,15 @@ class TestAudio8ProcessorPadToken:
     """
 
     @patch("engines.audio8_engine.Audio8Engine._get_model_path", return_value="/fake/model.onnx")
-    def test_processor_adopts_vocab_pad_token(self, mock_path):
-        """processor sets pad_token from existing vocab when none is wired."""
+    def test_processor_adopts_vocab_pad_token(self, mock_path, tmp_path):
+        """processor uses tokenizer.json and sets the existing vocab pad token."""
         from engines.audio8_engine import Audio8Engine
 
         class _BareTokenizer:
             """Tokenizer without special-token wiring (mirrors the real model)."""
 
             pad_token = None
+            eos_token = "<|eos|>"
 
             def __init__(self):
                 self.converted_idx = None
@@ -294,15 +295,15 @@ class TestAudio8ProcessorPadToken:
                 self.converted_idx = idx
                 return "<|pad|>"
 
+        tokenizer_file = tmp_path / "tokenizer.json"
+        tokenizer_file.write_text("{}")
         registry = MagicMock()
-        registry.get_install_path.return_value = "/fake/install"
-        registry.get_cache_dir.return_value = "/fake/cache"
+        registry.get_install_path.return_value = str(tmp_path)
         engine = Audio8Engine(speaker_wav="voice.wav", registry=registry)
 
-        from transformers import AutoTokenizer
-
-        with patch.object(AutoTokenizer, "from_pretrained", return_value=_BareTokenizer()):
+        with patch("transformers.PreTrainedTokenizerFast", return_value=_BareTokenizer()) as tokenizer_class:
             _ = engine.processor
 
+        tokenizer_class.assert_called_once_with(tokenizer_file=str(tokenizer_file))
         assert engine._processor.pad_token == "<|pad|>"
         assert engine._processor.converted_idx == 0

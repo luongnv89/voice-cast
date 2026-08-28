@@ -136,6 +136,8 @@ class ChatterboxControls(EngineControlsBase):
 
     def __init__(self, variant: str = "turbo"):
         self.variant = variant
+        # ``variant`` belongs to this control, not QWidget. Do not forward it
+        # through EngineControlsBase, whose kwargs are Qt constructor options.
         super().__init__()
 
     def _setup_ui(self):
@@ -225,8 +227,8 @@ class MlxKokoroControls(EngineControlsBase):
     VOICE_GROUPS = KOKORO_VOICES
     LANG_CODES = KOKORO_LANG_CODES
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, variant: str = "kokoro"):
+        super().__init__()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -350,8 +352,8 @@ class MlxKokoroControls(EngineControlsBase):
 class MlxCsmControls(EngineControlsBase):
     """Control widget for MLX CSM voice cloning."""
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, variant: str = "csm"):
+        super().__init__()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)

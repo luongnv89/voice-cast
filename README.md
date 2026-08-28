@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/luongnv89/voice-cast/stargazers"><img src="https://img.shields.io/github/stars/luongnv89/voice-cast?style=flat-square" alt="GitHub Stars"></a>
   <a href="https://github.com/luongnv89/voice-cast/blob/main/LICENSE"><img src="https://img.shields.io/github/license/luongnv89/voice-cast?style=flat-square" alt="MIT License"></a>
-  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10+-blue?style=flat-square" alt="Python 3.10+"></a>
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10--3.12-blue?style=flat-square" alt="Python 3.10–3.12"></a>
   <img src="https://img.shields.io/badge/version-0.3.0-green?style=flat-square" alt="Version">
   <a href="https://github.com/luongnv89/voice-cast/issues"><img src="https://img.shields.io/github/issues/luongnv89/voice-cast?style=flat-square" alt="Issues"></a>
 </p>
@@ -49,7 +49,7 @@ VoiceCast solves all three. Record 5–30 seconds of any voice, and generate nat
 
 ## How It Works
 
-1. **Install** — Clone the repo, create a virtual environment, and `pip install -e .`.
+1. **Install** — Clone the repo, create a virtual environment, and install one engine extra (the quickstart uses Coqui).
 2. **Download a model intentionally** — VoiceCast does not download models during install or first generation; use the CLI or GUI Model Manager to fetch only what you need.
 3. **Pick a voice sample** — Any clean 5–30 second audio clip of the voice you want to clone.
 4. **Choose your engine** — Coqui XTTS v2 for multilingual quality, or Chatterbox for speed and expressiveness.
@@ -76,8 +76,14 @@ cd voice-cast
 python3.10 -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-# Install code and dependencies only; models are downloaded separately
-pip install -e .
+# Install the shared GUI/CLI dependencies and the default Coqui engine;
+# models are downloaded separately.
+pip install -e ".[coqui]"
+
+# Other engine extras are alternatives; install only one per virtual environment:
+# pip install -e ".[chatterbox]"   # Chatterbox, Torch 2.6, Transformers 5.2
+# pip install -e ".[audio8]"       # Audio8 ONNX, Transformers 4.x (>=4.46.3)
+# pip install -e ".[mlx]"          # MLX Audio, Apple Silicon only
 
 # See model cache status, then download only what you need
 python vcloner.py --list-models
@@ -87,19 +93,17 @@ python vcloner.py --download-models coqui-xtts-v2
 <details>
 <summary>CPU-only install (avoid 8 GB CUDA download)</summary>
 
-The default `pip install -e .` pulls CUDA-enabled `torch==2.6.0` plus NVIDIA wheels (~2.5 GB download, ~8 GB installed) and can fail on disk-quota-limited machines or CI (`OSError: Disk quota exceeded`). VoiceCast runs fine on CPU — GPU is optional.
+The shared install does not pull PyTorch. Each engine extra selects its own compatible PyTorch and Transformers line. For a CPU-only engine environment, install the small CPU wheels first, then the matching extra:
 
 ```bash
-# 1) Install the small CPU-only PyTorch wheels first
-pip install --index-url https://download.pytorch.org/whl/cpu torch torchaudio
-
-# 2) Install VoiceCast without re-pulling CUDA deps (reuse the CPU wheels)
-pip install -e . --no-deps
-# or, if you prefer a single step and accept the CUDA payload when space permits:
-# pip install -e .
+pip install --index-url https://download.pytorch.org/whl/cpu "torch==2.6.0" "torchaudio==2.6.0"
+pip install -e ".[chatterbox]"
 ```
 
-Trade-off: CPU inference is slower than CUDA but avoids the large download; model quality is identical. To use NVIDIA acceleration later, reinstall torch from the CUDA index (https://pytorch.org). See also `docs/agent-environment.md`.
+Do not install multiple Transformers-backed engine extras in one environment: Coqui
+uses Transformers 5.16, Chatterbox 0.1.7 uses Transformers 5.2.0, and Audio8
+uses Transformers 4.x (>=4.46.3). Use separate virtual environments if you need more
+than one. See also `docs/agent-environment.md`.
 
 </details>
 
@@ -145,10 +149,10 @@ No. Install and initialization do not download model files. Run `python vcloner.
 No. VoiceCast runs on CPU. An NVIDIA GPU with CUDA speeds up generation significantly, and Apple Silicon users can install the optional MLX backend for hardware acceleration.
 
 **What are the system requirements?**
-Python 3.10+, 8GB RAM (16GB recommended). Optional: NVIDIA GPU with CUDA or Apple Silicon with MLX.
+Python 3.10–3.12, 8GB RAM (16GB recommended). Optional: NVIDIA GPU with CUDA or Apple Silicon with MLX.
 
 **How does Coqui compare to Chatterbox?**
-Coqui XTTS v2 supports 16 languages and produces high-quality multilingual output. Chatterbox is English-only but faster and supports expressive emotion tags. Use both — VoiceCast makes switching engines seamless.
+Coqui XTTS v2 supports 16 languages and produces high-quality multilingual output. Chatterbox is English-only but faster and supports expressive emotion tags. Their dependencies are incompatible, so install each engine in a separate virtual environment and activate the one you need.
 
 **Is my voice data sent to the cloud?**
 No. Everything runs locally on your machine. No API keys, no cloud uploads, no telemetry.
@@ -188,7 +192,7 @@ MIT licensed. Runs locally. Works on Linux, macOS, and Windows.
 <details>
 <summary>System Requirements</summary>
 
-- Python 3.10+
+- Python 3.10–3.12
 - 8GB RAM (16GB recommended)
 - NVIDIA GPU with CUDA (optional, for faster processing)
 - Apple Silicon with MLX (optional, for hardware acceleration on Mac)

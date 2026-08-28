@@ -1,9 +1,8 @@
 """Tests guarding declared dependency floors and tool pin alignment.
 
 Covers the pyproject.toml dependency-surface contracts: bumped floors for
-soundfile/PySide6/rich/mlx/numpy (#53), transformers declared explicitly
-(#54), and one ruff version line shared by ci.yml, the dev extra, and the
-pre-commit rev.
+soundfile/PySide6/rich/mlx/numpy (#53), mutually exclusive engine extras, and
+one ruff version line shared by ci.yml, the dev extra, and the pre-commit rev.
 """
 
 import os
@@ -77,16 +76,38 @@ def test_mlx_optional_extra_floor_tracks_current_stable():
     assert _floor_major_minor(specs["mlx"]) == (0, 32)
 
 
-def test_transformers_declared_with_floor():
-    specs = _declared_specs()
-    assert "transformers" in specs, "voice_cloner.py imports transformers directly; it must be declared"
-    assert _floor_major_minor(specs["transformers"]) == (4, 46)
+def test_engine_extras_keep_transformers_constraints_separate():
+    core_specs = _declared_specs()
+    coqui_specs = _optional_extra_specs("coqui")
+    chatterbox_specs = _optional_extra_specs("chatterbox")
+    audio8_specs = _optional_extra_specs("audio8")
+
+    assert "transformers" not in core_specs, "incompatible engine constraints must not be in the shared core"
+    assert coqui_specs["torch"].endswith("<2.9")
+    assert coqui_specs["torchaudio"].endswith("<2.9")
+    assert _floor_major_minor(coqui_specs["transformers"]) == (5, 16)
+    assert coqui_specs["transformers"].endswith("<5.17")
+    assert chatterbox_specs["transformers"] == "==5.2.0"
+    assert _floor_major_minor(audio8_specs["transformers"]) == (4, 46)
+    assert audio8_specs["transformers"].endswith("<5.0.0")
+    assert _floor_major_minor(audio8_specs["huggingface-hub"]) == (0, 24)
+    assert audio8_specs["huggingface-hub"].endswith("<1.0")
+    assert "coqui-tts" in coqui_specs
+    assert "tts" not in core_specs and "chatterbox-tts" not in core_specs
 
     with open(os.path.join(ROOT, "voice_cloner.py")) as f:
         source = f.read()
-    assert re.search(r"^\s*(?:from transformers import|import transformers)", source, re.M), (
-        "the declared transformers edge is guarded by this import"
+    assert re.search(r"^\s*from transformers import logging", source, re.M), (
+        "the optional Transformers edge is guarded by a lazy import"
     )
+
+
+def test_incompatible_engine_extras_are_not_combined():
+    with open(os.path.join(ROOT, "pyproject.toml")) as f:
+        content = f.read()
+    assert re.search(r"^coqui\s*=", content, re.M)
+    assert re.search(r"^chatterbox\s*=", content, re.M)
+    assert not re.search(r"^all\s*=", content, re.M), "there must be no resolver-invalid all-engines extra"
 
 
 def _dev_ruff_spec():

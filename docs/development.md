@@ -4,7 +4,7 @@ This guide covers setting up a development environment and contributing to Voice
 
 ## Prerequisites
 
-- Python 3.10 or higher
+- Python 3.10–3.12
 - Git
 - (Optional) NVIDIA GPU with CUDA for faster processing
 
@@ -29,14 +29,28 @@ source .venv/bin/activate  # Linux/macOS
 ### 3. Install Dependencies
 
 ```bash
-# Core dependencies
-pip install -e .
-
-# Development dependencies
+# Shared GUI/CLI dependencies and development tools
 pip install -e ".[dev]"
 
-# Optional: Chatterbox TTS
-pip install -e ".[chatterbox]"
+# Install exactly one engine per virtual environment:
+# Coqui XTTS v2 (Torch 2.5–2.8, Transformers 5.16)
+pip install -e ".[coqui]"
+# Or Chatterbox (Python 3.10–3.12, Torch 2.6, Transformers 5.2)
+# pip install -e ".[chatterbox]"
+# Or Audio8 ONNX (Transformers 4.x (>=4.46.3))
+# pip install -e ".[audio8]"
+# Or MLX Audio (Apple Silicon only)
+# pip install -e ".[mlx]"
+```
+
+The supported Coqui TTS fork, Chatterbox 0.1.7, and Audio8 use incompatible
+Transformers versions, so do not combine these extras. Use separate virtual
+environments when developing those engines. `requirements.txt` is the
+universal lock for the shared core plus `dev`; it intentionally excludes the
+engine extras. Regenerate it with:
+
+```bash
+uv pip compile pyproject.toml --universal --extra dev -o requirements.txt
 ```
 
 ### 4. Install Pre-commit Hooks
@@ -315,6 +329,7 @@ The CI pipeline runs on every push and pull request:
 1. **Lint & Format**: Ruff checks
 2. **Security**: Bandit security scan
 3. **Tests**: pytest on Python 3.10, 3.11, 3.12
+4. **Dependency audit**: pip-audit against the pinned shared lockfile
 4. **Pre-commit**: Validates all hooks pass
 
 ### Running CI Checks Locally

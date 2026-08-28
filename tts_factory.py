@@ -32,7 +32,9 @@ class EngineDescriptor:
             elif "mlx" in self.name.lower():
                 import mlx_audio  # noqa: F401
             elif "audio8" in self.name.lower():
+                import huggingface_hub  # noqa: F401
                 import onnxruntime  # noqa: F401
+                import transformers  # noqa: F401
             return True
         except ImportError:
             return False

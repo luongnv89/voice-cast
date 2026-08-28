@@ -78,6 +78,15 @@ class TestEngineDescriptor:
         with patch("builtins.__import__", side_effect=ImportError("no TTS")):
             assert d.dependencies_installed() is False
 
+    def test_dependencies_installed_audio8_requires_tokenizer_and_hub(self):
+        d = EngineDescriptor(name="audio8-onnx", engine_class=StubEngine, display_name="Audio8")
+        assert d.dependencies_installed() is True
+
+    def test_dependencies_installed_audio8_missing_tokenizer(self):
+        d = EngineDescriptor(name="audio8-onnx", engine_class=StubEngine, display_name="Audio8")
+        with patch("builtins.__import__", side_effect=ImportError("no transformers")):
+            assert d.dependencies_installed() is False
+
 
 class TestTTSFactoryRegister:
     def test_registers_descriptor(self, basic_descriptor):

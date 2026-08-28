@@ -229,7 +229,7 @@ Install the required package:
 
 ```bash
 # For Chatterbox engines
-pip install chatterbox-tts
+pip install -e ".[chatterbox]"
 ```
 
 ### GUI Not Responding

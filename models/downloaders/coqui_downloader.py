@@ -137,8 +137,9 @@ class CoquiDownloader(BaseDownloader):
             return Path(model_path).parent
 
         except ImportError as e:
-            logger.error("TTS package not installed. Install with: pip install TTS")
-            raise ImportError("TTS package required. Install with: pip install TTS") from e
+            install_command = 'pip install -e ".[coqui]"'
+            logger.error("coqui-tts package not installed. Install with: %s", install_command)
+            raise ImportError(f"coqui-tts package required. Install with: {install_command}") from e
 
     def get_model_size(self, model_id: str) -> int:
         """Get approximate model size in bytes."""

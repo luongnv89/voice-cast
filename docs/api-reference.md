@@ -387,7 +387,7 @@ Check if an engine's dependencies are installed.
 if TTSFactory.is_available("chatterbox-turbo"):
     cloner = VoiceCloner(speaker_wav="./speaker.wav", engine="chatterbox-turbo")
 else:
-    print("Install chatterbox-tts: pip install chatterbox-tts")
+    print('Install the Chatterbox extra: pip install -e ".[chatterbox]"')
 ```
 
 ---

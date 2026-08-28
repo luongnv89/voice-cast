@@ -118,6 +118,21 @@ class TestCoquiStreamedProgress:
         assert downloaded == sorted(downloaded), "intermediate progress must be monotonic"
         assert callbacks[-1].status == "completed"
 
+    def test_missing_coqui_dependency_reports_supported_extra(self, monkeypatch):
+        from models.downloaders import coqui_downloader
+
+        def fail_download(*_args, **_kwargs):
+            raise ImportError("No module named TTS")
+
+        monkeypatch.setattr(coqui_downloader, "_download_model_with_progress", fail_download)
+
+        with pytest.raises(ImportError) as exc_info:
+            coqui_downloader.CoquiDownloader().download("coqui-xtts-v2")
+
+        message = str(exc_info.value)
+        assert 'pip install -e ".[coqui]"' in message
+        assert "pip install TTS" not in message
+
     def test_cancel_mid_transfer_propagates(self, tmp_path, monkeypatch):
         class CancelledError(Exception):
             pass

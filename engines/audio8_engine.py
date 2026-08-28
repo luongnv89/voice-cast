@@ -124,37 +124,35 @@ class Audio8Engine(TTSEngineBase):
         if self._processor is None:
             logger.info("Loading Audio8 processor...")
             try:
-                from transformers import AutoTokenizer
+                from transformers import PreTrainedTokenizerFast
 
                 _ = self._get_model_path()  # validate model is installed
                 install_path = self._registry.get_install_path(self._model_id)
-                cache_dir = self._registry.get_cache_dir("audio8-onnx")
-                # Snapshot-aware tokenizer resolution: snapshot dir contains
-                # tokenizer/ or tokenizer assets at root; fall back to rglob.
-                tokenizer_path: Path | None = None
+
+                # Locate tokenizer.json — it lives inside the snapshot's
+                # tokenizer/ subdirectory.
+                tokenizer_file: str | None = None
                 if install_path is not None:
                     base = Path(install_path)
-                    if (base / "tokenizer").exists():
-                        tokenizer_path = base / "tokenizer"
-                    elif (base / "tokenizer.json").exists() or any(base.rglob("tokenizer.json")):
-                        # HF repo may store tokenizer at root
-                        tokenizer_path = base
-                    else:
-                        # Search snapshot for a tokenizer directory
-                        for cand in base.rglob("tokenizer"):
-                            if cand.is_dir():
-                                tokenizer_path = cand
-                                break
-                        if tokenizer_path is None:
-                            tokenizer_path = base
-                else:
-                    tokenizer_path = Path(cache_dir)
+                    # Prefer files at the snapshot root, then support the
+                    # nested layout used by older Audio8 downloads.
+                    for candidate in (base / "tokenizer.json", base / "tokenizer" / "tokenizer.json"):
+                        if candidate.is_file():
+                            tokenizer_file = str(candidate)
+                            break
+                    if tokenizer_file is None:
+                        matches = sorted(path for path in base.rglob("tokenizer.json") if path.is_file())
+                        if matches:
+                            tokenizer_file = str(matches[0])
 
-                self._processor = AutoTokenizer.from_pretrained(  # nosec B615 - local cache path, revision pinned at download time
-                    str(tokenizer_path),
-                    cache_dir=str(cache_dir),
-                    local_files_only=True,
-                    trust_remote_code=False,
+                if tokenizer_file is None:
+                    raise FileNotFoundError("tokenizer.json not found in model snapshot")
+
+                # Load as a fast tokenizer directly — avoids the broken
+                # AutoTokenizer path that requires the missing arktts
+                # configuration files.
+                self._processor = PreTrainedTokenizerFast(
+                    tokenizer_file=tokenizer_file,
                 )
                 # The audio8-TTS-0.1B-ONNX-INT8 tokenizer ships with no
                 # special-token wiring: config.json declares pad_token_id=0
@@ -167,8 +165,9 @@ class Audio8Engine(TTSEngineBase):
                     self._processor.pad_token = self._processor.convert_ids_to_tokens(0)
                 logger.info("Audio8 processor loaded successfully")
             except ImportError as e:
-                logger.error("transformers package not installed. Install with: pip install transformers")
-                raise ImportError("transformers package required. Install with: pip install transformers") from e
+                install_command = 'pip install -e ".[audio8]"'
+                logger.error("Audio8 dependencies not installed. Install with: %s", install_command)
+                raise ImportError(f"Audio8 dependencies required. Install with: {install_command}") from e
         return self._processor
 
     def _get_all_onnx_files(self) -> list[Path]:
@@ -982,7 +981,9 @@ class Audio8Engine(TTSEngineBase):
     def is_available(cls) -> bool:
         """Check if Audio8 engine dependencies are available."""
         try:
+            import huggingface_hub  # noqa: F401
             import onnxruntime  # noqa: F401
+            import transformers  # noqa: F401
 
             return True
         except ImportError:
