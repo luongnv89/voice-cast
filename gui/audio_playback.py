@@ -97,4 +97,4 @@ class AudioPlaybackController:
 
     def reset(self):
         """Reset the controller state."""
-        self._current_audio = None
+        self._current_audio_path = None

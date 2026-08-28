@@ -101,7 +101,7 @@ class VoiceCloningApp(QMainWindow):
 
         dark_action = QAction("Dark", self)
         dark_action.setCheckable(True)
-        light_action.triggered.connect(lambda: self._set_theme(ThemeMode.DARK))
+        dark_action.triggered.connect(lambda: self._set_theme(ThemeMode.DARK))
         theme_menu.addAction(dark_action)
         self._theme_actions[ThemeMode.DARK] = dark_action
 
