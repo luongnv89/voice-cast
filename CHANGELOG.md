@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- `utils/text_chunker.split_into_chunks()`: split long text into
+  sentence-boundary-respecting chunks up to a configurable character
+  limit, for future use chunking text before TTS synthesis (#125).
+
 ### Fixed
 
 - Audio8: implement the real four-session ArkTTS pipeline (codec encoder,
