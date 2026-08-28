@@ -255,7 +255,7 @@ class CloneFlowController(QObject):
             True if generation started, False if validation failed.
         """
         # Validate voice file requirement
-        if self._ui.is_voice_required() and not self._ui.get_voice_path():
+        if self._ui.is_voice_required and not self._ui.get_voice_path():
             self._ui.warning(
                 "Missing Voice Reference",
                 "Please select an audio file (.wav, .mp3, .ogg, .flac) as voice reference.",
@@ -295,7 +295,7 @@ class CloneFlowController(QObject):
 
         # Prepare voice file
         temp_voice_path = ""
-        if self._ui.is_voice_required():
+        if self._ui.is_voice_required:
             try:
                 temp_voice = Path(tempfile.gettempdir()) / (
                     f"voice_{uuid.uuid4().hex}{Path(self._ui.get_voice_path()).suffix}"

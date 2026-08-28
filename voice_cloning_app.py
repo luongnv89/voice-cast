@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import QTimer, Slot
-from PySide6.QtGui import QAction, QIcon
+from PySide6.QtGui import QAction, QKeySequence, QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMenu,
     QMessageBox,
+    QStatusBar,
     QVBoxLayout,
     QWidget,
 )
@@ -65,6 +66,8 @@ class VoiceCloningApp(QMainWindow):
 
         self._setup_menu_bar()
         self._init_ui()
+        self._setup_status_bar()
+        self._setup_keyboard_shortcuts()
         self.setWindowTitle("VoiceCast")
         self.setMinimumSize(750, 650)
         self.setWindowIcon(QIcon(str(Path(__file__).parent / "icon.jpg")))
@@ -129,6 +132,7 @@ class VoiceCloningApp(QMainWindow):
         """Handle theme change."""
         self._update_theme_menu_state()
         self._apply_stage_label_font()
+        self._update_status_bar()
 
     def _apply_stage_label_font(self):
         """Keep the generation stage label emphasized across theme changes."""
@@ -230,6 +234,7 @@ class VoiceCloningApp(QMainWindow):
         engine_row.addWidget(engine_label)
 
         self.engine_combo = StyledComboBox()
+        self.engine_combo.setToolTip("Choose the TTS engine to use for generation")
         # Populate engine list dynamically from factory
         self._populate_engine_list()
         self.engine_combo.currentIndexChanged.connect(self.on_engine_changed)
@@ -249,7 +254,8 @@ class VoiceCloningApp(QMainWindow):
         text_layout = QVBoxLayout()
         self.text_input = StyledTextEdit()
         self.text_input.setPlaceholderText("Enter text to generate audio...")
-        self.text_input.setMinimumHeight(120)
+        self.text_input.setMinimumHeight(160)
+        self.text_input.setToolTip("Enter the text you want to synthesize into speech")
         self.text_input.textChanged.connect(self._update_generate_state)
         text_layout.addWidget(self.text_input)
         text_group.setLayout(text_layout)
@@ -262,11 +268,13 @@ class VoiceCloningApp(QMainWindow):
 
         self.btn_select_voice = StyledButton("Select Voice File", variant="secondary")
         self.btn_select_voice.setAccessibleName("Select voice file")
+        self.btn_select_voice.setToolTip("Select a reference audio file (WAV, MP3, OGG, FLAC) for voice cloning")
         self.btn_select_voice.clicked.connect(self.select_voice_file)
         self.btn_select_voice.clicked.connect(self._update_generate_state)
         voice_layout.addWidget(self.btn_select_voice)
 
         self.voice_label = StyledLabel("No voice file selected", role="muted")
+        self.voice_label.setToolTip("Selected voice reference file for cloning")
         self.voice_label.setWordWrap(True)
         voice_layout.addWidget(self.voice_label, stretch=1)
 
@@ -286,6 +294,7 @@ class VoiceCloningApp(QMainWindow):
         # Generate button
         self.btn_generate = StyledButton("Generate Audio", variant="primary")
         self.btn_generate.setAccessibleName("Generate audio")
+        self.btn_generate.setToolTip("Generate audio from the entered text and selected voice (Ctrl+G)")
         self.btn_generate.setMinimumHeight(48)
         self.btn_generate.clicked.connect(self._on_generate_clicked)
         self.btn_generate.setEnabled(False)
@@ -308,6 +317,7 @@ class VoiceCloningApp(QMainWindow):
 
         self._stage_label = StyledLabel("", role="info")
         self._stage_label.setAccessibleName("Generation stage")
+        self._stage_label.setToolTip("Current generation stage")
         self._stage_label.setWordWrap(True)
         self._apply_stage_label_font()
         self._stage_label.hide()
@@ -319,11 +329,13 @@ class VoiceCloningApp(QMainWindow):
 
         self.btn_play = StyledButton("Play", variant="secondary")
         self.btn_play.setAccessibleName("Play audio")
+        self.btn_play.setToolTip("Play the generated audio (Ctrl+P)")
         self.btn_play.clicked.connect(self._on_play_clicked)
         self.btn_play.hide()
 
         self.btn_save = StyledButton("Save Audio", variant="secondary")
         self.btn_save.setAccessibleName("Save audio")
+        self.btn_save.setToolTip("Save the generated audio to a file (Ctrl+S)")
         self.btn_save.clicked.connect(self._on_save_clicked)
         self.btn_save.hide()
 
@@ -336,6 +348,100 @@ class VoiceCloningApp(QMainWindow):
         self._update_generate_state()
 
         layout.addStretch()
+
+    # ------------------------------------------------------------------ #
+    # Status bar
+    # ------------------------------------------------------------------ #
+
+    def _setup_status_bar(self):
+        """Set up the application status bar."""
+        status_bar = QStatusBar()
+        status_bar.setContentsMargins(SPACING.sm, 0, SPACING.sm, 0)
+        self.setStatusBar(status_bar)
+
+        # Engine status indicator
+        self._status_engine = StyledLabel("Engine: —", role="muted")
+        status_bar.addWidget(self._status_engine, stretch=1)
+
+        # Model status indicator
+        self._status_model = StyledLabel("", role="muted")
+        status_bar.addWidget(self._status_model)
+
+        # Theme indicator
+        self._status_theme = StyledLabel("", role="muted")
+        status_bar.addWidget(self._status_theme)
+
+        self._update_status_bar()
+
+    def _update_status_bar(self):
+        """Update status bar with current engine and model info."""
+        engine_name = self.engine_combo.currentData()
+        if engine_name:
+            try:
+                metadata = TTSFactory.get_engine_metadata(engine_name)
+                display_name = metadata.get("display_name", engine_name)
+                self._status_engine.setText(f"Engine: {display_name}")
+            except ValueError:
+                self._status_engine.setText(f"Engine: {engine_name}")
+
+        if engine_name:
+            try:
+                model_id = self.get_model_id_for_engine(engine_name)
+                if self.is_model_installed(model_id):
+                    self._status_model.setText("✓ Model installed")
+                    self._status_model.set_role("success")
+                else:
+                    self._status_model.setText("○ Model not installed")
+                    self._status_model.set_role("muted")
+            except ValueError:
+                self._status_model.setText("")
+        else:
+            self._status_model.setText("")
+
+        tm = get_theme_manager()
+        mode_map = {ThemeMode.LIGHT: "☀ Light", ThemeMode.DARK: "☾ Dark", ThemeMode.SYSTEM: "⚙ System"}
+        self._status_theme.setText(mode_map.get(tm.current_mode, ""))
+
+    # ------------------------------------------------------------------ #
+    # Keyboard shortcuts
+    # ------------------------------------------------------------------ #
+
+    def _setup_keyboard_shortcuts(self):
+        """Set up keyboard shortcuts for primary actions."""
+        # Generate: Ctrl+G
+        shortcut_generate = QKeySequence("Ctrl+G")
+        action_generate = QAction(self)
+        action_generate.setShortcut(shortcut_generate)
+        action_generate.triggered.connect(self._on_generate_clicked)
+        self.addAction(action_generate)
+
+        # Save: Ctrl+S
+        shortcut_save = QKeySequence("Ctrl+S")
+        action_save = QAction(self)
+        action_save.setShortcut(shortcut_save)
+        action_save.triggered.connect(self._on_save_clicked)
+        self.addAction(action_save)
+
+        # Play: Ctrl+P
+        shortcut_play = QKeySequence("Ctrl+P")
+        action_play = QAction(self)
+        action_play.setShortcut(shortcut_play)
+        action_play.triggered.connect(self._on_play_clicked)
+        self.addAction(action_play)
+
+        # Tab 1: Ctrl+1
+        shortcut_tab1 = QKeySequence("Ctrl+1")
+        action_tab1 = QAction(self)
+        action_tab1.setShortcut(shortcut_tab1)
+        action_tab1.triggered.connect(lambda: self.tab_widget.setCurrentIndex(0))
+        self.addAction(action_tab1)
+
+        # Tab 2: Ctrl+2
+        shortcut_tab2 = QKeySequence("Ctrl+2")
+        action_tab2 = QAction(self)
+        action_tab2.setShortcut(shortcut_tab2)
+        action_tab2.triggered.connect(lambda: self.tab_widget.setCurrentIndex(1))
+        self.addAction(action_tab2)
 
     # ------------------------------------------------------------------ #
     # Engine management
@@ -382,6 +488,7 @@ class VoiceCloningApp(QMainWindow):
         engine_name = self.engine_combo.currentData()
         self._update_engine_controls(engine_name)
         self._clone_flow.engine_changed(engine_name)
+        self._update_status_bar()
 
     # ------------------------------------------------------------------ #
     # Voice file selection

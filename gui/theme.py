@@ -761,6 +761,11 @@ def apply_theme(app: QApplication):
         {generate_slider_style(palette)}
         {generate_progressbar_style(palette)}
         {generate_scrollarea_style(palette)}
+        {generate_button_style(palette=palette)}
+        {generate_label_style(role="primary", palette=palette)}
+        {generate_label_style(role="secondary", palette=palette)}
+        {generate_label_style(role="muted", palette=palette)}
+        {generate_card_style(palette=palette)}
     """
 
     app.setStyleSheet(stylesheet)
