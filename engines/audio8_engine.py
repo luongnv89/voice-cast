@@ -124,42 +124,37 @@ class Audio8Engine(TTSEngineBase):
         if self._processor is None:
             logger.info("Loading Audio8 processor...")
             try:
-                from transformers import AutoTokenizer
+                import glob
+                from transformers import PreTrainedTokenizerFast
 
                 _ = self._get_model_path()  # validate model is installed
                 install_path = self._registry.get_install_path(self._model_id)
-                cache_dir = self._registry.get_cache_dir("audio8-onnx")
-                # Snapshot-aware tokenizer resolution: the audio8-TTS-0.1B-ONNX-INT8
-                # repo stores config.json at the snapshot root (not inside
-                # tokenizer/).  AutoTokenizer.from_pretrained needs config.json
-                # to identify the model type, so we point at the root.
-                tokenizer_path: Path | None = None
+
+                # Locate tokenizer.json — it lives inside the snapshot's
+                # tokenizer/ subdirectory.
+                tokenizer_file: str | None = None
                 if install_path is not None:
                     base = Path(install_path)
-                    # Prefer the snapshot root which contains config.json
-                    if (base / "config.json").exists():
-                        tokenizer_path = base
-                    elif (base / "tokenizer").exists():
-                        tokenizer_path = base / "tokenizer"
-                    elif (base / "tokenizer.json").exists() or any(base.rglob("tokenizer.json")):
-                        # HF repo may store tokenizer at root
-                        tokenizer_path = base
+                    # Direct path
+                    tj = base / "tokenizer" / "tokenizer.json"
+                    if tj.exists():
+                        tokenizer_file = str(tj)
                     else:
-                        # Search snapshot for a tokenizer directory
-                        for cand in base.rglob("tokenizer"):
-                            if cand.is_dir():
-                                tokenizer_path = cand
-                                break
-                        if tokenizer_path is None:
-                            tokenizer_path = base
-                else:
-                    tokenizer_path = Path(cache_dir)
+                        # Search snapshot for any tokenizer.json
+                        matches = list(base.rglob("tokenizer/tokenizer.json"))
+                        if matches:
+                            tokenizer_file = str(matches[0])
 
-                self._processor = AutoTokenizer.from_pretrained(  # nosec B615 - local cache path, revision pinned at download time
-                    str(tokenizer_path),
-                    cache_dir=str(cache_dir),
-                    local_files_only=True,
-                    trust_remote_code=True,
+                if tokenizer_file is None:
+                    raise FileNotFoundError(
+                        "tokenizer.json not found in model snapshot"
+                    )
+
+                # Load as a fast tokenizer directly — avoids the broken
+                # AutoTokenizer path that requires the missing arktts
+                # configuration files.
+                self._processor = PreTrainedTokenizerFast(
+                    tokenizer_file=tokenizer_file,
                 )
                 # The audio8-TTS-0.1B-ONNX-INT8 tokenizer ships with no
                 # special-token wiring: config.json declares pad_token_id=0
