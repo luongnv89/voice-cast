@@ -2,6 +2,7 @@ import logging
 import os
 import tempfile
 from contextlib import contextmanager
+from contextvars import ContextVar
 from threading import RLock
 from typing import Any
 
@@ -19,6 +20,7 @@ logger = logging.getLogger("voice_cloner.coqui")
 # ``weights_only`` is omitted. Keep the temporary compatibility patch scoped to
 # model construction so other callers retain torch.load's safe default.
 _COQUI_TORCH_LOAD_LOCK = RLock()
+_COQUI_TORCH_LOAD_ACTIVE: ContextVar[bool] = ContextVar("_COQUI_TORCH_LOAD_ACTIVE", default=False)
 
 
 @contextmanager
@@ -28,14 +30,17 @@ def _coqui_torch_load_compatibility():
         original_torch_load = torch.load
 
         def patched_torch_load(*args, **kwargs):
-            kwargs.setdefault("weights_only", False)
+            if _COQUI_TORCH_LOAD_ACTIVE.get():
+                kwargs.setdefault("weights_only", False)
             return original_torch_load(*args, **kwargs)
 
+        token = _COQUI_TORCH_LOAD_ACTIVE.set(True)
         torch.load = patched_torch_load
         try:
             yield
         finally:
             torch.load = original_torch_load
+            _COQUI_TORCH_LOAD_ACTIVE.reset(token)
 
 
 # Model ID for registry lookup

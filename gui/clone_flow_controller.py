@@ -14,7 +14,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import QObject, Qt, QThread, Signal, Slot
 from PySide6.QtWidgets import QMessageBox
 
 from voice_cloner import VoiceCloner
@@ -123,7 +123,7 @@ class CloneThread(QThread):
             self.error_occurred.emit(str(e))
 
 
-class CloneFlowController:
+class CloneFlowController(QObject):
     """Manages the clone generation lifecycle.
 
     Coordinates UI state, validation, thread management, and result handling
@@ -160,6 +160,7 @@ class CloneFlowController:
                 - switch_to_model_manager()
                 - is_thread_running() -> bool
         """
+        super().__init__()
         self._ui = ui_delegate
         self._thread = None
         self._temp_voice_file = None
@@ -261,16 +262,26 @@ class CloneFlowController:
             engine_params=engine_params,
             voice_cloner=voice_cloner,
         )
-        self._thread.finished.connect(self._on_finished)
-        self._thread.error_occurred.connect(self._on_error)
-        self._thread.stage_changed.connect(self._on_stage_changed)
+        self._connect_thread_signals(self._thread)
         self._thread.start()
         return True
 
+    @staticmethod
+    def _connect_queued(signal, slot):
+        signal.connect(slot, Qt.ConnectionType.QueuedConnection)
+
+    def _connect_thread_signals(self, thread: CloneThread):
+        """Connect worker signals to GUI-thread handlers."""
+        self._connect_queued(thread.finished, self._on_finished)
+        self._connect_queued(thread.error_occurred, self._on_error)
+        self._connect_queued(thread.stage_changed, self._on_stage_changed)
+
+    @Slot(str)
     def _on_stage_changed(self, stage: str):
         """Handle stage change during generation."""
         self._ui.set_stage_text(stage)
 
+    @Slot(str, str)
     def _on_finished(self, output_path: str, text: str):
         """Handle successful generation completion."""
         self._ui.current_audio = output_path
@@ -282,6 +293,7 @@ class CloneFlowController:
             "Audio generation completed.\n\nUse Save Audio to choose where to save it.",
         )
 
+    @Slot(str)
     def _on_error(self, message: str):
         """Handle generation error."""
         self._cleanup_temp()
