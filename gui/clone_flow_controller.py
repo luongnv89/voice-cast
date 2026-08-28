@@ -265,7 +265,7 @@ class CloneFlowController(QObject):
         # Validate text input
         text = self._ui.get_text_input().strip()
         if not text:
-            self._ui.warning(self, "Missing Text", "Please enter text to generate audio.")
+            self._ui.warning("Missing Text", "Please enter text to generate audio.")
             return False
 
         # Keep the native worker reference until its finished signal is handled.
