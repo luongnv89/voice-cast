@@ -536,7 +536,6 @@ def generate_progressbar_style(palette: ColorPalette | None = None) -> str:
             color: {palette.text_primary};
             font-size: {TYPOGRAPHY.size_sm}px;
             min-height: 20px;
-            text-visible: false;
         }}
         QProgressBar::chunk {{
             background-color: {palette.accent};
