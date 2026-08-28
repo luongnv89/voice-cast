@@ -125,6 +125,16 @@ class VoiceCloningApp(QMainWindow):
     def _on_theme_changed(self, mode: ThemeMode):
         """Handle theme change."""
         self._update_theme_menu_state()
+        self._apply_stage_label_font()
+
+    def _apply_stage_label_font(self):
+        """Keep the generation stage label emphasized across theme changes."""
+        if not hasattr(self, "_stage_label"):
+            return
+        font = self._stage_label.font()
+        font.setBold(True)
+        font.setPixelSize(14)
+        self._stage_label.setFont(font)
 
     def _on_tab_changed(self, index: int):
         """Refresh model status when Model Manager tab is activated."""
@@ -279,9 +289,7 @@ class VoiceCloningApp(QMainWindow):
         self._stage_label = StyledLabel("", role="info")
         self._stage_label.setAccessibleName("Generation stage")
         self._stage_label.setWordWrap(True)
-        self._stage_label.setStyleSheet(
-            self._stage_label.styleSheet() + "QLabel { font-size: 14px; font-weight: bold; }"
-        )
+        self._apply_stage_label_font()
         self._stage_label.hide()
         layout.addWidget(self._stage_label)
 

@@ -279,7 +279,7 @@ class CloneFlowController:
         self._ui.show_play_save()
         self._ui.info(
             "Generation Complete",
-            f"Audio saved to:\n\n{output_path}",
+            "Audio generation completed.\n\nUse Save Audio to choose where to save it.",
         )
 
     def _on_error(self, message: str):

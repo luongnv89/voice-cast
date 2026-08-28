@@ -124,8 +124,6 @@ class Audio8Engine(TTSEngineBase):
         if self._processor is None:
             logger.info("Loading Audio8 processor...")
             try:
-                import glob
-
                 from transformers import PreTrainedTokenizerFast
 
                 _ = self._get_model_path()  # validate model is installed
@@ -136,13 +134,14 @@ class Audio8Engine(TTSEngineBase):
                 tokenizer_file: str | None = None
                 if install_path is not None:
                     base = Path(install_path)
-                    # Direct path
-                    tj = base / "tokenizer" / "tokenizer.json"
-                    if tj.exists():
-                        tokenizer_file = str(tj)
-                    else:
-                        # Search snapshot for any tokenizer.json
-                        matches = list(base.rglob("tokenizer/tokenizer.json"))
+                    # Prefer files at the snapshot root, then support the
+                    # nested layout used by older Audio8 downloads.
+                    for candidate in (base / "tokenizer.json", base / "tokenizer" / "tokenizer.json"):
+                        if candidate.is_file():
+                            tokenizer_file = str(candidate)
+                            break
+                    if tokenizer_file is None:
+                        matches = sorted(path for path in base.rglob("tokenizer.json") if path.is_file())
                         if matches:
                             tokenizer_file = str(matches[0])
 
