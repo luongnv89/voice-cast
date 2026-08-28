@@ -74,8 +74,9 @@ class Audio8Downloader(BaseDownloader):
                 **extra_kwargs,
             )
         except ImportError as e:
-            logger.error("huggingface_hub package not installed. Install with: pip install huggingface_hub")
-            raise ImportError("huggingface_hub package required. Install with: pip install huggingface_hub") from e
+            install_command = 'pip install -e ".[audio8]"'
+            logger.error("Audio8 dependencies not installed. Install with: %s", install_command)
+            raise ImportError(f"Audio8 dependencies required. Install with: {install_command}") from e
 
         elapsed = time.time() - start_time
         if progress_callback:

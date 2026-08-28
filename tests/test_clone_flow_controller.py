@@ -24,6 +24,7 @@ class _UiDelegate:
     def __init__(self, event_loop):
         self._event_loop = event_loop
         self.info_calls = 0
+        self.info_message = None
         self.info_thread_id = None
         self.stage_thread_id = None
 
@@ -48,8 +49,9 @@ class _UiDelegate:
     def set_stage_text(self, _stage):
         self.stage_thread_id = threading.get_ident()
 
-    def info(self, _title, _message):
+    def info(self, _title, message):
         self.info_calls += 1
+        self.info_message = message
         self.info_thread_id = threading.get_ident()
         self._event_loop.quit()
 
@@ -86,5 +88,6 @@ def test_clone_completion_runs_on_gui_thread(qapp):
 
     gui_thread_id = threading.get_ident()
     assert ui.info_calls == 1
+    assert str(ui.current_audio) in ui.info_message
     assert ui.info_thread_id == gui_thread_id
     assert ui.stage_thread_id == gui_thread_id

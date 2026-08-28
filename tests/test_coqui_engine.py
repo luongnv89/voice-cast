@@ -19,7 +19,7 @@ def _make_engine(coqui_engine, registry):
 
 
 class TestCoquiTorchLoadCompatibility:
-    def test_unrelated_thread_keeps_safe_default_load_behavior(self, monkeypatch):
+    def test_scoped_load_overrides_explicit_weights_only(self, monkeypatch):
         from engines import coqui_engine
 
         original_load = MagicMock(return_value=object())
@@ -36,7 +36,7 @@ class TestCoquiTorchLoadCompatibility:
         assert original_load.call_args_list == [
             call("unrelated.pth"),
             call("legacy.pth", weights_only=False),
-            call("safe.pth", weights_only=True),
+            call("safe.pth", weights_only=False),
         ]
 
     def test_torch_load_restored_after_model_construction(self, monkeypatch):
@@ -80,3 +80,11 @@ class TestCoquiTorchLoadCompatibility:
 
         assert coqui_engine.torch.load is original_load
         original_load.assert_called_once_with("checkpoint.pth", weights_only=False)
+
+        # The compatibility lock must remain reusable after a failed load.
+        with coqui_engine._coqui_torch_load_compatibility():
+            coqui_engine.torch.load("after-error.pth")
+        assert original_load.call_args_list == [
+            call("checkpoint.pth", weights_only=False),
+            call("after-error.pth", weights_only=False),
+        ]

@@ -147,9 +147,8 @@ class VoiceCloningApp(QMainWindow):
 
     def closeEvent(self, event):
         """Clean up resources when window closes."""
-        # Terminate any in-flight generation to prevent crash-on-exit
-        if self._clone_flow.is_running:
-            self._clone_flow.terminate()
+        # Request cooperative shutdown for any in-flight generation.
+        self._clone_flow.terminate()
 
         # Stop any playing audio
         if self._audio.audio_available:
@@ -431,8 +430,9 @@ class VoiceCloningApp(QMainWindow):
         self._stage_label.hide()
 
     def set_stage_text(self, text: str):
-        """Set the generation stage text."""
+        """Set the generation stage text and accessible status."""
         self._stage_label.setText(text)
+        self._stage_label.setAccessibleName(f"Generation stage: {text}" if text else "Generation stage")
         self._stage_label.show()
 
     def get_text_input(self) -> str:

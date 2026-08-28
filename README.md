@@ -80,8 +80,10 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -e .
 
 # Install exactly one ML engine in this virtual environment:
-# pip install -e ".[coqui]"       # Coqui TTS fork, Transformers 5.16
-# pip install -e ".[chatterbox]"   # Chatterbox, Transformers 5.2
+# pip install -e ".[coqui]"       # Coqui TTS fork, Torch 2.5–2.8, Transformers 5.16
+# pip install -e ".[chatterbox]"   # Chatterbox, Torch 2.6, Transformers 5.2
+# pip install -e ".[audio8]"       # Audio8 ONNX, Transformers 4.x (>=4.46.3)
+# pip install -e ".[mlx]"          # MLX Audio, Apple Silicon only
 
 # See model cache status, then download only what you need
 python vcloner.py --list-models
@@ -98,7 +100,10 @@ pip install --index-url https://download.pytorch.org/whl/cpu "torch==2.6.0" "tor
 pip install -e ".[chatterbox]"
 ```
 
-Do not install both `[coqui]` and `[chatterbox]` in one environment: the supported Coqui TTS fork requires Transformers 5.16, while Chatterbox 0.1.7 requires Transformers 5.2.0. Use separate virtual environments if you need both. See also `docs/agent-environment.md`.
+Do not install multiple Transformers-backed engine extras in one environment: Coqui
+uses Transformers 5.16, Chatterbox 0.1.7 uses Transformers 5.2.0, and Audio8
+uses Transformers 4.x (>=4.46.3). Use separate virtual environments if you need more
+than one. See also `docs/agent-environment.md`.
 
 </details>
 

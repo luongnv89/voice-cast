@@ -15,13 +15,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# These engines cannot share one environment: Coqui TTS requires Transformers
-# 4.x while Chatterbox 0.1.7 requires Transformers 5.2.0. Install one extra
-# per virtual environment; do not combine them.
+# Transformers-backed engines use separate version lines: Coqui TTS uses
+# Transformers 5.16.x, Chatterbox 0.1.7 requires 5.2.0, and Audio8 uses 4.x.
+# Install one engine extra per virtual environment; do not combine them.
 coqui = [
     "coqui-tts==0.27.5",
-    "torch>=2.5.1,<2.11",
-    "torchaudio>=2.5.1,<2.11",
+    "torch>=2.5.1,<2.9",
+    "torchaudio>=2.5.1,<2.9",
     "transformers>=5.16.1,<5.17",
 ]
 chatterbox = [
@@ -38,6 +38,8 @@ audio8 = [
     "onnxruntime>=1.18.0",
     "librosa>=0.10.0",
     "scipy>=1.11.0",
+    "transformers>=4.46.3,<5.0.0",
+    "huggingface-hub>=0.24.0,<1.0",
 ]
 dev = [
     "pytest>=8.0.0",

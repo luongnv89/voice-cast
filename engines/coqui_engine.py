@@ -31,7 +31,7 @@ def _coqui_torch_load_compatibility():
 
         def patched_torch_load(*args, **kwargs):
             if _COQUI_TORCH_LOAD_ACTIVE.get():
-                kwargs.setdefault("weights_only", False)
+                kwargs["weights_only"] = False
             return original_torch_load(*args, **kwargs)
 
         token = _COQUI_TORCH_LOAD_ACTIVE.set(True)

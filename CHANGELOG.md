@@ -14,6 +14,13 @@
   `padding=True` tokenizer call.
 - CLI: allow `--download-models --engine audio8` (add the `audio8` group alias
   to the engine-group choices alongside `chatterbox` and `mlx-audio`).
+- Dependency fixes: Audio8 now installs its Transformers tokenizer and Hugging
+  Face downloader dependencies, while Coqui is capped at PyTorch 2.8 to avoid
+  the coqui-tts torchcodec import path.
+- Coqui checkpoint loading now overrides PyTorch's `weights_only` default only
+  inside the scoped model-construction compatibility context; GUI completion
+  feedback includes the generated path and exposes the current stage to
+  assistive technology.
 
 ### Documentation
 
@@ -83,9 +90,9 @@
 ### Added
 
 - Engine dependencies are now explicit, mutually exclusive extras: the
-  maintained Coqui TTS fork with Transformers 5.16.x, or Chatterbox 0.1.7
-  with Transformers 5.2.0. The shared universal lock intentionally contains
-  only the core and dev dependencies (#121)
+  maintained Coqui TTS fork with Transformers 5.16.x, Chatterbox 0.1.7 with
+  Transformers 5.2.0, or Audio8 with Transformers 4.x. The shared universal
+  lock intentionally contains only the core and dev dependencies (#121)
 - Dependency floors refreshed toward current stable for soundfile (`0.14.0`),
   PySide6 (`6.11.0`), rich (`15.0.0`), mlx (`0.32.0`), and numpy (`1.26.0`);
   ruff CI pin and dev-extra cap moved to `>=0.16.0,<0.17.0`, aligned with the
@@ -93,9 +100,10 @@
 
 ### Changed
 
-- Coqui and Chatterbox are no longer installed in the same environment because
-  their resolver constraints require incompatible Transformers versions;
-  installation guidance now documents separate engine environments (#121)
+- Coqui, Chatterbox, and Audio8 are no longer installed in the same environment
+  because their resolver constraints require incompatible Transformers
+  versions; installation guidance now documents separate engine environments
+  (#121)
 - The CI security job can now fail: bandit runs blocking (no `|| true`) and
   `safety check` is replaced by a pip-audit scan of the fully pinned lockfile
   via `scripts/pip_audit_lockfile.sh` (`--no-deps --disable-pip`; no package

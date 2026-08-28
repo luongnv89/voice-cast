@@ -80,11 +80,18 @@ def test_engine_extras_keep_transformers_constraints_separate():
     core_specs = _declared_specs()
     coqui_specs = _optional_extra_specs("coqui")
     chatterbox_specs = _optional_extra_specs("chatterbox")
+    audio8_specs = _optional_extra_specs("audio8")
 
     assert "transformers" not in core_specs, "incompatible engine constraints must not be in the shared core"
+    assert coqui_specs["torch"].endswith("<2.9")
+    assert coqui_specs["torchaudio"].endswith("<2.9")
     assert _floor_major_minor(coqui_specs["transformers"]) == (5, 16)
     assert coqui_specs["transformers"].endswith("<5.17")
     assert chatterbox_specs["transformers"] == "==5.2.0"
+    assert _floor_major_minor(audio8_specs["transformers"]) == (4, 46)
+    assert audio8_specs["transformers"].endswith("<5.0.0")
+    assert _floor_major_minor(audio8_specs["huggingface-hub"]) == (0, 24)
+    assert audio8_specs["huggingface-hub"].endswith("<1.0")
     assert "coqui-tts" in coqui_specs
     assert "tts" not in core_specs and "chatterbox-tts" not in core_specs
 

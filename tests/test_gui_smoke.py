@@ -37,3 +37,14 @@ def test_main_window_constructs_offscreen(qapp):
         assert window.centralWidget() is not None
     finally:
         window.close()
+
+
+def test_stage_accessible_name_tracks_current_stage(qapp):
+    """Assistive technology must receive the current generation stage."""
+    window = voice_cloning_app.VoiceCloningApp()
+    try:
+        window.set_stage_text("Loading model...")
+        assert window._stage_label.text() == "Loading model..."
+        assert window._stage_label.accessibleName() == "Generation stage: Loading model..."
+    finally:
+        window.close()

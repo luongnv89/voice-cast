@@ -6,10 +6,18 @@ not downloaded until you explicitly request them.
 
 ## Workflow
 
-1. Install VoiceCast:
+1. Install VoiceCast and the extra for the engine whose model you will use.
+   Engine extras provide the downloader and runtime dependencies; keep the
+   Transformers-backed engines in separate environments:
 
    ```bash
    pip install -e .
+
+   # Choose the engine extra for this environment:
+   pip install -e ".[coqui]"
+   # or: pip install -e ".[chatterbox]"
+   # or: pip install -e ".[audio8]"
+   # or: pip install -e ".[mlx]"  # Apple Silicon only
    ```
 
 2. List models and local cache status:
@@ -18,7 +26,8 @@ not downloaded until you explicitly request them.
    python vcloner.py --list-models
    ```
 
-3. Download only the model(s) you need:
+3. Download only the model(s) you need. Downloads are explicit actions and
+   require the corresponding engine extra from step 1:
 
    ```bash
    python vcloner.py --download-models coqui-xtts-v2
@@ -48,7 +57,8 @@ normal generation.
 | `mlx-csm` | `mlx-audio` | Apple Silicon voice cloning |
 | `audio8-tts` | `audio8-onnx` | CPU-first ONNX voice cloning (Audio8 0.1B) |
 
-MLX model downloads use the Hugging Face cache and require `huggingface_hub`.
+MLX and Audio8 model downloads use the Hugging Face cache. The selected
+extra supplies `huggingface_hub` and the tokenizer/runtime dependencies.
 Generation still requires the optional MLX backend on Apple Silicon.
 
 ## Python API

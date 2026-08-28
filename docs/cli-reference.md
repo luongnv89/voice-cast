@@ -306,11 +306,14 @@ python vcloner.py -i /full/path/to/speaker.wav ...
 Install required packages:
 
 ```bash
-# Core dependencies
-pip install torch torchaudio TTS sounddevice soundfile rich
+# Shared dependencies
+pip install -e .
 
-# For Chatterbox engine
-pip install chatterbox-tts
+# Install the extra for the engine you use (one per environment):
+pip install -e ".[coqui]"
+# or: pip install -e ".[chatterbox]"
+# or: pip install -e ".[audio8]"
+# or: pip install -e ".[mlx]"  # Apple Silicon only
 ```
 
 ### "Engine not available"

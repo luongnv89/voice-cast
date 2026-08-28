@@ -32,8 +32,10 @@ python -m pip install --upgrade pip
 pip install -e ".[dev]"
 
 # Optional engine environment — choose one, never both:
-pip install -e ".[coqui]"       # Coqui TTS fork, Transformers 5.16
-# pip install -e ".[chatterbox]" # Python 3.10–3.12, Transformers 5.2
+pip install -e ".[coqui]"       # Coqui TTS fork, Torch 2.5–2.8, Transformers 5.16
+# pip install -e ".[chatterbox]" # Python 3.10–3.12, Torch 2.6, Transformers 5.2
+# pip install -e ".[audio8]"     # Audio8 ONNX, Transformers 4.x (>=4.46.3)
+# pip install -e ".[mlx]"        # Apple Silicon only
 
 # Minimal environment sufficient for the test suite (what CI does)
 pip install sounddevice soundfile rich numpy
@@ -52,7 +54,7 @@ import state itself. You do not need the ML stack to run tests.
 The lockfile pins the shared runtime **and dev** tooling (`pytest`,
 `pytest-cov`, `ruff`, `bandit`, `pre-commit`), so one install gives you
 everything the commands of record below need. Engine extras are intentionally
-not included because Coqui and Chatterbox require incompatible Transformers
+not included because the Transformers-backed engines require incompatible
 major versions. Install one engine extra in a dedicated environment when
 running that engine.
 
@@ -69,9 +71,9 @@ Gotchas discovered during that verification:
   Python 3.14 (unsupported); the project declares `<3.13`. Use
   `python3.11`/`python3.12`, not bare `python3`.
 - **Engine extras are mutually exclusive.** The supported Coqui TTS fork uses
-  Transformers 5.16 and Chatterbox 0.1.7 uses `transformers==5.2.0` on Python
-  3.10–3.12.
-  Use separate virtual environments; there is deliberately no `all` extra.
+  Transformers 5.16, Chatterbox 0.1.7 uses `transformers==5.2.0`, and Audio8
+  uses Transformers 4.x (>=4.46.3) on Python 3.10–3.12. Use separate virtual
+  environments; there is deliberately no `all` extra.
 - **Regenerate the shared lock with `--extra dev`.**
   `uv pip compile pyproject.toml --universal --extra dev -o requirements.txt`
   excludes engine extras by design. The dev extra caps `ruff < 0.17` on
@@ -97,12 +99,15 @@ Both are installed by the CI test job (`.github/workflows/ci.yml`).
 
 - The shared install does not include PyTorch or Transformers.
 - Coqui: `pip install -e ".[coqui]"` in Python 3.10–3.12; this selects
-  `coqui-tts==0.27.5`, PyTorch 2.5–2.10, and Transformers 5.16.x.
+  `coqui-tts==0.27.5`, PyTorch 2.5–2.8, and Transformers 5.16.x. The Torch
+  ceiling avoids the coqui-tts torchcodec import requirement.
 - Chatterbox: `pip install -e ".[chatterbox]"` in Python 3.10–3.12; this
   selects Chatterbox 0.1.7, PyTorch 2.6.0, and Transformers 5.2.0.
+- Audio8: `pip install -e ".[audio8]"`; this selects ONNX Runtime, the
+  Transformers 4.x tokenizer (>=4.46.3), and the Hugging Face Hub downloader.
 - For CPU wheels, install matching PyTorch packages from the CPU index before
   the engine extra. For NVIDIA GPUs, use the appropriate PyTorch CUDA index
-  instead (https://pytorch.org). Never combine the two engine extras.
+  instead (https://pytorch.org). Never combine incompatible engine extras.
 - Optional MLX backend (Apple Silicon only): `pip install -e ".[mlx]"`.
 
 ### PySide6 (GUI)

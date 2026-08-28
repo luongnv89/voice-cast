@@ -42,14 +42,14 @@ ModuleNotFoundError: No module named 'TTS'
 **Solutions:**
 
 ```bash
-# Core dependencies
-pip install torch torchaudio TTS sounddevice soundfile PySide6 rich pygame numpy
+# Shared dependencies
+pip install -e .
 
-# For Chatterbox
-pip install chatterbox-tts
-
-# Or install all at once
-pip install -e ".[chatterbox]"
+# Install the extra for the engine you use (one per environment):
+pip install -e ".[coqui]"
+# or: pip install -e ".[chatterbox]"
+# or: pip install -e ".[audio8]"
+# or: pip install -e ".[mlx]"  # Apple Silicon only
 ```
 
 ### sounddevice Issues on Linux
@@ -347,7 +347,7 @@ ImportError: chatterbox-tts package required
 
 **Solution:**
 ```bash
-pip install chatterbox-tts
+pip install -e ".[chatterbox]"
 ```
 
 ---

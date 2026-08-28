@@ -165,8 +165,9 @@ class Audio8Engine(TTSEngineBase):
                     self._processor.pad_token = self._processor.convert_ids_to_tokens(0)
                 logger.info("Audio8 processor loaded successfully")
             except ImportError as e:
-                logger.error("transformers package not installed. Install with: pip install transformers")
-                raise ImportError("transformers package required. Install with: pip install transformers") from e
+                install_command = 'pip install -e ".[audio8]"'
+                logger.error("Audio8 dependencies not installed. Install with: %s", install_command)
+                raise ImportError(f"Audio8 dependencies required. Install with: {install_command}") from e
         return self._processor
 
     def _get_all_onnx_files(self) -> list[Path]:
@@ -980,7 +981,9 @@ class Audio8Engine(TTSEngineBase):
     def is_available(cls) -> bool:
         """Check if Audio8 engine dependencies are available."""
         try:
+            import huggingface_hub  # noqa: F401
             import onnxruntime  # noqa: F401
+            import transformers  # noqa: F401
 
             return True
         except ImportError:

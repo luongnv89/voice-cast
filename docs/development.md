@@ -33,16 +33,20 @@ source .venv/bin/activate  # Linux/macOS
 pip install -e ".[dev]"
 
 # Install exactly one engine per virtual environment:
-# Coqui XTTS v2 (Coqui TTS fork, Transformers 5.16)
+# Coqui XTTS v2 (Torch 2.5–2.8, Transformers 5.16)
 pip install -e ".[coqui]"
-# Or Chatterbox (Python 3.10–3.12, Transformers 5.2)
+# Or Chatterbox (Python 3.10–3.12, Torch 2.6, Transformers 5.2)
 # pip install -e ".[chatterbox]"
+# Or Audio8 ONNX (Transformers 4.x (>=4.46.3))
+# pip install -e ".[audio8]"
+# Or MLX Audio (Apple Silicon only)
+# pip install -e ".[mlx]"
 ```
 
-The supported Coqui TTS fork and Chatterbox 0.1.7 require incompatible
-Transformers versions, so do not combine these extras. Use separate virtual environments
-when developing both engines. `requirements.txt` is the universal lock for the
-shared core plus `dev`; it intentionally excludes the mutually exclusive
+The supported Coqui TTS fork, Chatterbox 0.1.7, and Audio8 use incompatible
+Transformers versions, so do not combine these extras. Use separate virtual
+environments when developing those engines. `requirements.txt` is the
+universal lock for the shared core plus `dev`; it intentionally excludes the
 engine extras. Regenerate it with:
 
 ```bash

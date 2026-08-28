@@ -51,3 +51,72 @@ class TestWindowCloseSafety:
             assert hasattr(window._clone_flow, "is_running")
         finally:
             window.close()
+
+    def test_terminate_requests_cooperative_shutdown(self, qapp):
+        """Closing a generation must not forcibly terminate its QThread."""
+        from gui.clone_flow_controller import CloneFlowController
+
+        class CooperativeThread:
+            def __init__(self, wait_results=(True,)):
+                self.running = True
+                self.interruption_requests = 0
+                self.wait_calls = []
+                self.wait_results = iter(wait_results)
+
+            def isRunning(self):
+                return self.running
+
+            def requestInterruption(self):
+                self.interruption_requests += 1
+
+            def wait(self, *args):
+                self.wait_calls.append(args)
+                result = next(self.wait_results)
+                if result:
+                    self.running = False
+                return result
+
+            def terminate(self):
+                raise AssertionError("generation threads must never be forcibly terminated")
+
+        controller = CloneFlowController(object())
+        thread = CooperativeThread()
+        controller._thread = thread
+
+        controller.terminate()
+
+        assert thread.interruption_requests == 1
+        assert thread.wait_calls == [(5000,)]
+        assert controller._thread is None
+
+    def test_terminate_waits_for_natural_completion_after_timeout(self, qapp):
+        """A slow model load is allowed to finish instead of being killed."""
+        from gui.clone_flow_controller import CloneFlowController
+
+        class SlowCooperativeThread:
+            def __init__(self):
+                self.running = True
+                self.wait_calls = []
+                self.wait_results = iter((False, True))
+
+            def isRunning(self):
+                return self.running
+
+            def requestInterruption(self):
+                pass
+
+            def wait(self, *args):
+                self.wait_calls.append(args)
+                result = next(self.wait_results)
+                if result:
+                    self.running = False
+                return result
+
+        controller = CloneFlowController(object())
+        thread = SlowCooperativeThread()
+        controller._thread = thread
+
+        controller.terminate()
+
+        assert thread.wait_calls == [(5000,), ()]
+        assert controller._thread is None

@@ -8,6 +8,7 @@ Extracts the voice cloning generation flow from the main application window:
 """
 
 import contextlib
+import logging
 import shutil
 import tempfile
 import uuid
@@ -18,6 +19,8 @@ from PySide6.QtCore import QObject, Qt, QThread, Signal, Slot
 from PySide6.QtWidgets import QMessageBox
 
 from voice_cloner import VoiceCloner
+
+logger = logging.getLogger("voice_cloner.gui.clone_flow")
 
 
 class VoiceClonerCache:
@@ -73,7 +76,7 @@ class VoiceClonerCache:
 class CloneThread(QThread):
     """Thread for running TTS generation without blocking the UI."""
 
-    finished = Signal(str, str)
+    completed = Signal(str, str)
     error_occurred = Signal(str)
     stage_changed = Signal(str)
 
@@ -93,8 +96,18 @@ class CloneThread(QThread):
         self._voice_cloner = voice_cloner
         self.output_path = None
 
+    def _discard_output(self):
+        """Remove an output created by a cooperatively cancelled run."""
+        if self.output_path is not None:
+            with contextlib.suppress(OSError):
+                Path(self.output_path).unlink(missing_ok=True)
+
     def run(self):
         try:
+            if self.isInterruptionRequested():
+                self._discard_output()
+                return
+
             # Create temporary output directory
             output_dir = Path(tempfile.gettempdir()) / "voice_cloning"
             output_dir.mkdir(exist_ok=True)
@@ -109,6 +122,10 @@ class CloneThread(QThread):
                 self.stage_changed.emit("Loading model...")
                 voice_cloner = VoiceCloner(speaker_wav=self.voice_path, engine=self.engine_name)
 
+            if self.isInterruptionRequested():
+                self._discard_output()
+                return
+
             # Generate audio
             self.stage_changed.emit("Synthesizing...")
             voice_cloner.say(
@@ -118,9 +135,15 @@ class CloneThread(QThread):
                 output_file=str(self.output_path),
                 **self.engine_params,
             )
-            self.finished.emit(str(self.output_path), self.text)
+            if self.isInterruptionRequested():
+                self._discard_output()
+                return
+            self.completed.emit(str(self.output_path), self.text)
         except Exception as e:
-            self.error_occurred.emit(str(e))
+            if self.isInterruptionRequested():
+                self._discard_output()
+            else:
+                self.error_occurred.emit(str(e))
 
 
 class CloneFlowController(QObject):
@@ -163,6 +186,7 @@ class CloneFlowController(QObject):
         super().__init__()
         self._ui = ui_delegate
         self._thread = None
+        self._shutting_down = False
         self._temp_voice_file = None
         self._cloner_cache = VoiceClonerCache()
 
@@ -172,14 +196,25 @@ class CloneFlowController(QObject):
         return self._thread is not None and self._thread.isRunning()
 
     def terminate(self):
-        """Terminate the generation thread if running.
+        """Request cooperative shutdown and wait for the generation thread.
 
-        Blocks until the thread has finished terminating.
+        The worker may be inside a third-party model loader, so forcibly
+        terminating it could skip cleanup in scoped compatibility contexts.
+        Wait for natural completion instead of calling ``QThread.terminate``.
         """
-        if self._thread is not None and self._thread.isRunning():
-            self._thread.terminate()
-            self._thread.wait(5000)  # Wait up to 5 seconds
-            self._thread = None
+        self._shutting_down = True
+        thread = self._thread
+        if thread is None:
+            return
+
+        if thread.isRunning():
+            thread.requestInterruption()
+            if not thread.wait(5000):
+                logger.warning("Generation thread did not stop after 5 seconds; waiting for natural completion")
+                thread.wait()
+
+        self._thread = None
+        self._cleanup_temp()
 
     def start(self) -> bool:
         """Start the voice cloning process.
@@ -242,6 +277,7 @@ class CloneFlowController(QObject):
                 return False
 
         # Disable UI during processing
+        self._shutting_down = False
         self._ui.disable_generate()
         self._ui.set_generate_text("Generating audio...")
         self._ui.hide_play_save()
@@ -272,30 +308,42 @@ class CloneFlowController(QObject):
 
     def _connect_thread_signals(self, thread: CloneThread):
         """Connect worker signals to GUI-thread handlers."""
-        self._connect_queued(thread.finished, self._on_finished)
+        self._connect_queued(thread.completed, self._on_finished)
         self._connect_queued(thread.error_occurred, self._on_error)
         self._connect_queued(thread.stage_changed, self._on_stage_changed)
+        self._connect_queued(thread.finished, lambda: self._on_thread_finished(thread))
+
+    def _on_thread_finished(self, thread: CloneThread):
+        """Release a worker reference only after its native thread stopped."""
+        if self._thread is thread:
+            self._thread = None
 
     @Slot(str)
     def _on_stage_changed(self, stage: str):
         """Handle stage change during generation."""
-        self._ui.set_stage_text(stage)
+        if not self._shutting_down:
+            self._ui.set_stage_text(stage)
 
     @Slot(str, str)
     def _on_finished(self, output_path: str, text: str):
         """Handle successful generation completion."""
+        if self._shutting_down:
+            return
         self._ui.current_audio = output_path
         self._cleanup_temp()
         self._reset_ui()
         self._ui.show_play_save()
         self._ui.info(
             "Generation Complete",
-            "Audio generation completed.\n\nUse Save Audio to choose where to save it.",
+            f"Audio generation completed.\n\nGenerated audio: {output_path}\n\n"
+            "Use Save Audio to choose where to save it.",
         )
 
     @Slot(str)
     def _on_error(self, message: str):
         """Handle generation error."""
+        if self._shutting_down:
+            return
         self._cleanup_temp()
         self._reset_ui()
         self._ui.critical("Generation Error", f"Failed to generate audio:\n\n{message}")
