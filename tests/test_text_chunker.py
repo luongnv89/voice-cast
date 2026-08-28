@@ -111,6 +111,90 @@ class TestPunctuationVariants:
         assert result == [text]
 
 
+class TestWhitespaceHandling:
+    """Non-empty input is trimmed and sentence separators are normalized."""
+
+    @pytest.mark.parametrize(
+        ("text", "expected"),
+        [
+            pytest.param(
+                "  First sentence.   Second sentence. \n",
+                ["First sentence. Second sentence."],
+                id="trim-and-collapse-spaces",
+            ),
+            pytest.param(
+                "First sentence.\n\tSecond sentence.",
+                ["First sentence. Second sentence."],
+                id="collapse-newline-and-tab",
+            ),
+            pytest.param(
+                "\tFirst sentence.\n\nSecond sentence.  ",
+                ["First sentence. Second sentence."],
+                id="trim-and-collapse-newlines",
+            ),
+        ],
+    )
+    def test_trims_and_normalizes_sentence_whitespace(self, text, expected):
+        assert split_into_chunks(text, max_chars=100) == expected
+
+
+class TestGreedyPacking:
+    """Sentences are packed into each chunk until the next one no longer fits."""
+
+    @pytest.mark.parametrize(
+        ("text", "max_chars", "expected"),
+        [
+            pytest.param(
+                "One. Two. Three.",
+                9,
+                ["One. Two.", "Three."],
+                id="exact-first-chunk-then-remainder",
+            ),
+            pytest.param(
+                "One. Two. Three. Four.",
+                12,
+                ["One. Two.", "Three. Four."],
+                id="greedy-packing-resumes-after-split",
+            ),
+            pytest.param(
+                "One. Two. Three. Four.",
+                9,
+                ["One. Two.", "Three.", "Four."],
+                id="remainder-sentences-respect-limit",
+            ),
+        ],
+    )
+    def test_packs_sentences_greedily(self, text, max_chars, expected):
+        assert split_into_chunks(text, max_chars=max_chars) == expected
+
+
+class TestOversizedSentencePositions:
+    """An oversized sentence remains whole wherever it appears in the input."""
+
+    @pytest.mark.parametrize(
+        ("text", "expected"),
+        [
+            pytest.param(
+                "Oversized sentence. One. Two.",
+                ["Oversized sentence.", "One. Two."],
+                id="at-start",
+            ),
+            pytest.param(
+                "One. Oversized sentence. Two.",
+                ["One.", "Oversized sentence.", "Two."],
+                id="in-middle",
+            ),
+            pytest.param(
+                "One. Two. Oversized sentence.",
+                ["One. Two.", "Oversized sentence."],
+                id="at-end",
+            ),
+        ],
+    )
+    def test_oversized_sentence_isolated_at_any_position(self, text, expected):
+        assert split_into_chunks(text, max_chars=10) == expected
+
+
 class TestInvalidMaxChars:
     """max_chars <= 0 raises ValueError."""
 
