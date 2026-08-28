@@ -113,23 +113,23 @@ class Audio8Engine(TTSEngineBase):
                 import onnxruntime as ort
 
                 onnx_files = self._get_all_onnx_files()
-                logger.info(f"Found {len(onnx_files)} ONNX file(s): {[str(f) for f in onnx_files]}")
+                logger.debug(f"Found {len(onnx_files)} ONNX file(s): {[str(f) for f in onnx_files]}")
                 if len(onnx_files) > 1:
                     sessions: dict[str, Any] = {}
                     for fp in sorted(onnx_files):
-                        logger.info(f"Loading ONNX session: {fp.name}")
+                        logger.debug(f"Loading ONNX session: {fp.name}")
                         t0 = time.perf_counter()
                         sessions[Path(fp).stem] = ort.InferenceSession(
                             str(fp),
                             providers=self._get_providers(),
                         )
                         elapsed = time.perf_counter() - t0
-                        logger.info(f"  Loaded {fp.name} in {elapsed:.2f}s")
+                        logger.debug(f"  Loaded {fp.name} in {elapsed:.2f}s")
                     self._model = sessions
                     logger.info(f"Audio8 ONNX models loaded: {', '.join(sessions.keys())}")
                 else:
                     model_path = self._get_model_path()
-                    logger.info(f"Loading single ONNX model: {model_path}")
+                    logger.debug(f"Loading single ONNX model: {model_path}")
                     t0 = time.perf_counter()
                     self._model = ort.InferenceSession(
                         str(model_path),
@@ -159,18 +159,18 @@ class Audio8Engine(TTSEngineBase):
                 tokenizer_file: str | None = None
                 if install_path is not None:
                     base = Path(install_path)
-                    logger.info(f"Model install path: {install_path}")
+                    logger.debug(f"Model install path: {install_path}")
                     # Prefer files at the snapshot root, then support the
                     # nested layout used by older Audio8 downloads.
                     for candidate in (base / "tokenizer.json", base / "tokenizer" / "tokenizer.json"):
-                        logger.info(f"Checking tokenizer candidate: {candidate}")
+                        logger.debug(f"Checking tokenizer candidate: {candidate}")
                         if candidate.is_file():
                             tokenizer_file = str(candidate)
-                            logger.info(f"Found tokenizer.json at {candidate}")
+                            logger.debug(f"Found tokenizer.json at {candidate}")
                             break
                     if tokenizer_file is None:
                         matches = sorted(path for path in base.rglob("tokenizer.json") if path.is_file())
-                        logger.info(f"rglob found {len(matches)} tokenizer.json files")
+                        logger.debug(f"rglob found {len(matches)} tokenizer.json files")
                         if matches:
                             tokenizer_file = str(matches[0])
 
@@ -192,7 +192,7 @@ class Audio8Engine(TTSEngineBase):
                 # ONNX input space.
                 if self._processor.pad_token is None:
                     self._processor.pad_token = self._processor.convert_ids_to_tokens(0)
-                    logger.info("Set pad_token from vocab (was None)")
+                    logger.debug("Set pad_token from vocab (was None)")
                 elapsed = time.perf_counter() - t0
                 logger.info(f"Audio8 processor loaded in {elapsed:.2f}s")
             except ImportError as e:
@@ -313,9 +313,9 @@ class Audio8Engine(TTSEngineBase):
             raise FileNotFoundError(f"Speaker reference file not found: {self.speaker_wav}")
 
         logger.info("Generating audio with Audio8 ONNX model...")
-        logger.info(f"Text: {text!r}")
-        logger.info(f"Language: {language}, Speed: {speed}")
-        logger.info(f"Speaker reference: {self.speaker_wav}")
+        logger.debug(f"Text: {text!r}")
+        logger.debug(f"Language: {language}, Speed: {speed}")
+        logger.debug(f"Speaker reference: {self.speaker_wav}")
 
         session = self.model
 
@@ -436,7 +436,7 @@ class Audio8Engine(TTSEngineBase):
         manifest = self._load_manifest()
         if not manifest:
             raise RuntimeError("Audio8 runtime_manifest.json not found; cannot run the ArkTTS pipeline.")
-        logger.info(f"ArkTTS manifest: {json.dumps(manifest, indent=2)}")
+        logger.debug(f"ArkTTS manifest: {json.dumps(manifest, indent=2)}")
 
         slow = self._find_session(sessions, "slow_ar")
         fast = self._find_session(sessions, "fast_ar")
@@ -458,19 +458,19 @@ class Audio8Engine(TTSEngineBase):
         else:
             codes = self._load_bundled_reference_codes()
         elapsed = time.perf_counter() - t0
-        logger.info(f"  Reference encoded in {elapsed:.2f}s, shape: {codes.shape}")
+        logger.debug(f"  Reference encoded in {elapsed:.2f}s, shape: {codes.shape}")
         if codes.shape[0] != num_codebooks or codes.shape[1] == 0:
             raise RuntimeError(f"invalid reference codes shape: {codes.shape}")
 
         reference_text = kwargs.get("reference_transcript") or ""
         prompt = self._build_arktts_prompt(text, reference_text, codes, semantic_begin, num_codebooks)
-        logger.info(f"ArkTTS prompt built: shape={prompt.shape}, text tokens={prompt.shape[2]}")
+        logger.debug(f"ArkTTS prompt built: shape={prompt.shape}, text tokens={prompt.shape[2]}")
 
         logger.info("Starting ArkTTS autoregressive generation...")
         t0 = time.perf_counter()
         frames = self._iter_arktts_frames(slow, fast, prompt, manifest, kwargs)
         elapsed = time.perf_counter() - t0
-        logger.info(
+        logger.debug(
             f"  Autoregressive generation completed: {len(frames)} frames in {elapsed:.2f}s ({elapsed / max(len(frames), 1):.3f}s/frame)"
         )
         if not frames:
@@ -481,7 +481,7 @@ class Audio8Engine(TTSEngineBase):
         t0 = time.perf_counter()
         audio = self._decode_arktts(decoder, generated, num_codebooks)
         elapsed = time.perf_counter() - t0
-        logger.info(f"  Decoded in {elapsed:.2f}s, waveform shape: {audio.shape}")
+        logger.debug(f"  Decoded in {elapsed:.2f}s, waveform shape: {audio.shape}")
         if speed != 1.0:
             try:
                 import scipy.signal
@@ -745,7 +745,7 @@ class Audio8Engine(TTSEngineBase):
         logger.info(f"  Generating tokens (max {max_new_tokens})...")
         for step in range(max_new_tokens):
             if step % 10 == 0:
-                logger.info(f"    Token {step}/{max_new_tokens}...")
+                logger.debug(f"    Token {step}/{max_new_tokens}...")
             semantic = self._sample_semantic(
                 logits,
                 previous,
@@ -776,7 +776,7 @@ class Audio8Engine(TTSEngineBase):
             logits, hidden = slow_step(prompt_len + step, column)
 
         total_tokens = len(frames)
-        logger.info(f"  Generation complete: {total_tokens} tokens generated")
+        logger.debug(f"  Generation complete: {total_tokens} tokens generated")
         return frames
 
     @staticmethod

@@ -96,6 +96,7 @@ class CoquiControls(EngineControlsBase):
         for display_name, code in self.LANGUAGES:
             self.lang_combo.addItem(display_name, code)
         self.lang_combo.setToolTip("Select the language for synthesis")
+        self.lang_combo.setAccessibleName("Synthesis language")
         self.lang_combo.currentIndexChanged.connect(self._on_param_changed)
         lang_layout.addWidget(self.lang_combo)
         lang_layout.addStretch()
@@ -115,6 +116,7 @@ class CoquiControls(EngineControlsBase):
             value_scale=0.01,
         )
         self.temp_slider.slider.setToolTip("Adjust voice creativity (0.10–1.00)")
+        self.temp_slider.slider.setAccessibleName("Temperature")
         self.temp_slider.slider.valueChanged.connect(self._on_param_changed)
         temp_layout.addWidget(self.temp_slider)
 
@@ -162,6 +164,7 @@ class ChatterboxControls(EngineControlsBase):
             value_scale=0.01,
         )
         self.cfg_slider.slider.setToolTip("Control how closely the output follows the input text")
+        self.cfg_slider.slider.setAccessibleName("CFG weight")
         self.cfg_slider.slider.valueChanged.connect(self._on_param_changed)
         cfg_layout.addWidget(self.cfg_slider)
 
@@ -183,6 +186,7 @@ class ChatterboxControls(EngineControlsBase):
             value_scale=0.01,
         )
         self.exag_slider.slider.setToolTip("Control expressiveness and emotional intensity")
+        self.exag_slider.slider.setAccessibleName("Exaggeration")
         self.exag_slider.slider.valueChanged.connect(self._on_param_changed)
         exag_layout.addWidget(self.exag_slider)
 
@@ -251,6 +255,7 @@ class MlxKokoroControls(EngineControlsBase):
         for lang in self.VOICE_GROUPS:
             self.lang_combo.addItem(lang, self.LANG_CODES[lang])
         self.lang_combo.setToolTip("Select the language for preset voices")
+        self.lang_combo.setAccessibleName("Voice language")
         self.lang_combo.currentIndexChanged.connect(self._on_language_changed)
         lang_layout.addWidget(self.lang_combo)
         lang_layout.addStretch()
@@ -266,6 +271,7 @@ class MlxKokoroControls(EngineControlsBase):
 
         self.category_combo = StyledComboBox()
         self.category_combo.setToolTip("Filter voices by gender")
+        self.category_combo.setAccessibleName("Voice category")
         self.category_combo.currentIndexChanged.connect(self._on_category_changed)
         cat_layout.addWidget(self.category_combo)
         cat_layout.addStretch()
@@ -281,6 +287,7 @@ class MlxKokoroControls(EngineControlsBase):
 
         self.voice_combo = StyledComboBox()
         self.voice_combo.setToolTip("Select a preset voice")
+        self.voice_combo.setAccessibleName("Preset voice")
         self.voice_combo.currentIndexChanged.connect(self._on_param_changed)
         voice_layout.addWidget(self.voice_combo)
         voice_layout.addStretch()
@@ -302,6 +309,7 @@ class MlxKokoroControls(EngineControlsBase):
             value_scale=0.01,
         )
         self.speed_slider.slider.setToolTip("Adjust speech speed (0.50x–2.00x)")
+        self.speed_slider.slider.setAccessibleName("Speech speed")
         self.speed_slider.slider.valueChanged.connect(self._on_param_changed)
         speed_layout.addWidget(self.speed_slider)
 
@@ -384,6 +392,7 @@ class MlxCsmControls(EngineControlsBase):
             value_scale=0.01,
         )
         self.speed_slider.slider.setToolTip("Adjust speech speed (0.50x–2.00x)")
+        self.speed_slider.slider.setAccessibleName("Speech speed")
         self.speed_slider.slider.valueChanged.connect(self._on_param_changed)
         speed_layout.addWidget(self.speed_slider)
 
@@ -434,6 +443,7 @@ class Audio8Controls(EngineControlsBase):
             value_scale=0.01,
         )
         self.speed_slider.slider.setToolTip("Adjust speech speed (0.50x–2.00x)")
+        self.speed_slider.slider.setAccessibleName("Speech speed")
         self.speed_slider.slider.valueChanged.connect(self._on_param_changed)
         speed_layout.addWidget(self.speed_slider)
 

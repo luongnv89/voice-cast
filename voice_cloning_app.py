@@ -388,10 +388,10 @@ class VoiceCloningApp(QMainWindow):
             try:
                 model_id = self.get_model_id_for_engine(engine_name)
                 if self.is_model_installed(model_id):
-                    self._status_model.setText("✓ Model installed")
+                    self._status_model.setText("[OK] Model installed")
                     self._status_model.set_role("success")
                 else:
-                    self._status_model.setText("○ Model not installed")
+                    self._status_model.setText("[--] Model not installed")
                     self._status_model.set_role("muted")
             except ValueError:
                 self._status_model.setText("")
@@ -399,7 +399,7 @@ class VoiceCloningApp(QMainWindow):
             self._status_model.setText("")
 
         tm = get_theme_manager()
-        mode_map = {ThemeMode.LIGHT: "☀ Light", ThemeMode.DARK: "☾ Dark", ThemeMode.SYSTEM: "⚙ System"}
+        mode_map = {ThemeMode.LIGHT: "[L] Light", ThemeMode.DARK: "[D] Dark", ThemeMode.SYSTEM: "[S] System"}
         self._status_theme.setText(mode_map.get(tm.current_mode, ""))
 
     # ------------------------------------------------------------------ #

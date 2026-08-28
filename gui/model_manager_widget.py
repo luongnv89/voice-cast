@@ -224,6 +224,7 @@ class ModelCard(StyledCard):
         if self.model.is_installed:
             self.download_btn.setText("Installed")
             self.download_btn.setEnabled(False)
+            self.download_btn.setToolTip("Model already installed")
             self.download_btn.set_variant("secondary")
         else:
             self.download_btn.setText("Download")
