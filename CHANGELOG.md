@@ -21,6 +21,9 @@
   inside the scoped model-construction compatibility context; GUI completion
   feedback includes the generated path and exposes the current stage to
   assistive technology.
+- GUI shutdown now remains responsive while generation finishes cooperatively,
+  cancellation cleans only unique per-run output files, and the quickstart
+  installs the default Coqui engine extra with separate-environment guidance.
 
 ### Documentation
 

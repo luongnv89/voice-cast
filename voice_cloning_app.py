@@ -8,7 +8,7 @@ import contextlib
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import Slot
+from PySide6.QtCore import QTimer, Slot
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
     QApplication,
@@ -59,6 +59,9 @@ class VoiceCloningApp(QMainWindow):
         # Extracted collaborators
         self._audio = AudioPlaybackController()
         self._clone_flow = CloneFlowController(self)
+        self._close_pending = False
+        self._close_retry_queued = False
+        self._clone_flow.worker_finished.connect(self._on_clone_worker_finished)
 
         self._setup_menu_bar()
         self._init_ui()
@@ -146,9 +149,14 @@ class VoiceCloningApp(QMainWindow):
     # ------------------------------------------------------------------ #
 
     def closeEvent(self, event):
-        """Clean up resources when window closes."""
-        # Request cooperative shutdown for any in-flight generation.
-        self._clone_flow.terminate()
+        """Close only after any in-flight generation has exited naturally."""
+        if self._clone_flow.has_worker:
+            self._close_pending = True
+            event.ignore()
+            self._clone_flow.terminate()
+            return
+
+        self._close_pending = False
 
         # Stop any playing audio
         if self._audio.audio_available:
@@ -166,6 +174,19 @@ class VoiceCloningApp(QMainWindow):
         self._cleanup_temp_files()
 
         super().closeEvent(event)
+
+    @Slot()
+    def _on_clone_worker_finished(self):
+        """Retry a close request once the generation worker is fully stopped."""
+        if not self._close_pending or self._clone_flow.has_worker or self._close_retry_queued:
+            return
+        self._close_retry_queued = True
+        QTimer.singleShot(0, self._retry_close)
+
+    def _retry_close(self):
+        self._close_retry_queued = False
+        if self._close_pending and not self._clone_flow.has_worker:
+            self.close()
 
     def _cleanup_temp_files(self):
         """Clean up temporary files."""

@@ -49,7 +49,7 @@ VoiceCast solves all three. Record 5–30 seconds of any voice, and generate nat
 
 ## How It Works
 
-1. **Install** — Clone the repo, create a virtual environment, and `pip install -e .`.
+1. **Install** — Clone the repo, create a virtual environment, and install one engine extra (the quickstart uses Coqui).
 2. **Download a model intentionally** — VoiceCast does not download models during install or first generation; use the CLI or GUI Model Manager to fetch only what you need.
 3. **Pick a voice sample** — Any clean 5–30 second audio clip of the voice you want to clone.
 4. **Choose your engine** — Coqui XTTS v2 for multilingual quality, or Chatterbox for speed and expressiveness.
@@ -76,11 +76,11 @@ cd voice-cast
 python3.10 -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-# Install the shared GUI/CLI dependencies; models are downloaded separately
-pip install -e .
+# Install the shared GUI/CLI dependencies and the default Coqui engine;
+# models are downloaded separately.
+pip install -e ".[coqui]"
 
-# Install exactly one ML engine in this virtual environment:
-# pip install -e ".[coqui]"       # Coqui TTS fork, Torch 2.5–2.8, Transformers 5.16
+# Other engine extras are alternatives; install only one per virtual environment:
 # pip install -e ".[chatterbox]"   # Chatterbox, Torch 2.6, Transformers 5.2
 # pip install -e ".[audio8]"       # Audio8 ONNX, Transformers 4.x (>=4.46.3)
 # pip install -e ".[mlx]"          # MLX Audio, Apple Silicon only
@@ -152,7 +152,7 @@ No. VoiceCast runs on CPU. An NVIDIA GPU with CUDA speeds up generation signific
 Python 3.10–3.12, 8GB RAM (16GB recommended). Optional: NVIDIA GPU with CUDA or Apple Silicon with MLX.
 
 **How does Coqui compare to Chatterbox?**
-Coqui XTTS v2 supports 16 languages and produces high-quality multilingual output. Chatterbox is English-only but faster and supports expressive emotion tags. Use both — VoiceCast makes switching engines seamless.
+Coqui XTTS v2 supports 16 languages and produces high-quality multilingual output. Chatterbox is English-only but faster and supports expressive emotion tags. Their dependencies are incompatible, so install each engine in a separate virtual environment and activate the one you need.
 
 **Is my voice data sent to the cloud?**
 No. Everything runs locally on your machine. No API keys, no cloud uploads, no telemetry.

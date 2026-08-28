@@ -1,6 +1,7 @@
 """Regression tests for GUI-thread clone completion handling."""
 
 import threading
+from types import SimpleNamespace
 
 import pytest
 
@@ -9,6 +10,7 @@ pytest.importorskip("PySide6")
 from PySide6.QtCore import QEventLoop, QTimer  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
+from gui import clone_flow_controller
 from gui.clone_flow_controller import CloneFlowController, CloneThread  # noqa: E402
 
 
@@ -91,3 +93,33 @@ def test_clone_completion_runs_on_gui_thread(qapp):
     assert str(ui.current_audio) in ui.info_message
     assert ui.info_thread_id == gui_thread_id
     assert ui.stage_thread_id == gui_thread_id
+
+
+def test_output_paths_are_unique_and_owned_cleanup_is_collision_safe(qapp, tmp_path, monkeypatch):
+    """A colliding prior output is preserved while the current output is removable."""
+    monkeypatch.setattr(clone_flow_controller.tempfile, "gettempdir", lambda: str(tmp_path))
+    uuids = iter(
+        [
+            SimpleNamespace(hex="collision"),
+            SimpleNamespace(hex="collision"),
+        ]
+    )
+    monkeypatch.setattr(clone_flow_controller.uuid, "uuid4", lambda: next(uuids))
+
+    first = CloneThread("first", "voice.wav", "test", {}, _VoiceCloner())
+    first.output_path.parent.mkdir(parents=True, exist_ok=True)
+    first.output_path.touch()
+    second = CloneThread("second", "voice.wav", "test", {}, _VoiceCloner())
+
+    assert first.output_path != second.output_path
+    assert first.output_path.exists()
+
+    first._discard_output()
+    assert first.output_path.exists()
+
+    second.output_path.touch()
+    second.output_owned = True
+    second._discard_output()
+
+    assert not second.output_path.exists()
+    assert first.output_path.exists()
