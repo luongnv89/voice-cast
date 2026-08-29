@@ -119,6 +119,9 @@ Use the **Model Manager** tab to download models before generating.
 python vcloner.py -i voice.wav -t "Hello world" -o output.wav
 ```
 
+For long text, use `--chunk-size <characters>` to override the selected engine's
+limit and `--silence-duration <milliseconds>` to tune the pause between chunks.
+
 **Or call the Python API:**
 ```python
 from voice_cloner import VoiceCloner

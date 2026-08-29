@@ -154,10 +154,8 @@ class CloneThread(QThread):
 
             # Generate audio
             self.stage_changed.emit("Synthesizing...")
-            voice_cloner.say(
+            voice_cloner.generate(
                 self.text,
-                play_audio=False,
-                save_audio=True,
                 output_file=str(self.output_path),
                 **self.engine_params,
             )

@@ -10,6 +10,7 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QMessageBox,
+    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
@@ -35,6 +36,7 @@ class EngineControlsBase(QWidget):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._setup_ui()
+        self._add_chunking_controls()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -50,8 +52,45 @@ class EngineControlsBase(QWidget):
 
         layout.addStretch()
 
+    def _add_chunking_controls(self):
+        """Add controls shared by every chunk-capable built-in engine."""
+        group = StyledGroupBox("Chunking")
+        row = QHBoxLayout()
+        row.setContentsMargins(SPACING.sm, SPACING.sm, SPACING.sm, SPACING.sm)
+        row.setSpacing(SPACING.sm)
+
+        label = StyledLabel("Silence between chunks:", role="secondary")
+        row.addWidget(label)
+
+        self.silence_duration_spin = QSpinBox()
+        self.silence_duration_spin.setRange(0, 10_000)
+        self.silence_duration_spin.setValue(200)
+        self.silence_duration_spin.setSuffix(" ms")
+        self.silence_duration_spin.setToolTip("Set the silence inserted between text chunks")
+        self.silence_duration_spin.setAccessibleName("Silence between text chunks")
+        self.silence_duration_spin.valueChanged.connect(self._on_param_changed)
+        row.addWidget(self.silence_duration_spin)
+        row.addStretch()
+
+        group.setLayout(row)
+        layout = self.layout()
+        position = layout.count()
+        if position and layout.itemAt(position - 1).spacerItem() is not None:
+            position -= 1
+        layout.insertWidget(position, group)
+
+    def _on_param_changed(self):
+        self.parameters_changed.emit(self.get_parameters())
+
     def get_parameters(self) -> dict[str, Any]:
-        """Return current parameter values."""
+        """Return current engine and chunking parameter values."""
+        silence_control = getattr(self, "silence_duration_spin", None)
+        return {
+            **self._get_engine_parameters(),
+            "silence_duration": silence_control.value() if silence_control else 200,
+        }
+
+    def _get_engine_parameters(self) -> dict[str, Any]:
         return {}
 
 
@@ -126,7 +165,7 @@ class CoquiControls(EngineControlsBase):
     def _on_param_changed(self):
         self.parameters_changed.emit(self.get_parameters())
 
-    def get_parameters(self) -> dict[str, Any]:
+    def _get_engine_parameters(self) -> dict[str, Any]:
         return {
             "language": self.lang_combo.currentData(),
             "temperature": self.temp_slider.scaled_value(),
@@ -222,7 +261,7 @@ class ChatterboxControls(EngineControlsBase):
             f"Place tags where you want the sound to occur.",
         )
 
-    def get_parameters(self) -> dict[str, Any]:
+    def _get_engine_parameters(self) -> dict[str, Any]:
         return {
             "cfg_weight": self.cfg_slider.scaled_value(),
             "exaggeration": self.exag_slider.scaled_value(),
@@ -358,7 +397,7 @@ class MlxKokoroControls(EngineControlsBase):
     def _on_param_changed(self):
         self.parameters_changed.emit(self.get_parameters())
 
-    def get_parameters(self) -> dict[str, Any]:
+    def _get_engine_parameters(self) -> dict[str, Any]:
         return {
             "voice": self.voice_combo.currentData() or "af_heart",
             "speed": self.speed_slider.scaled_value(),
@@ -411,7 +450,7 @@ class MlxCsmControls(EngineControlsBase):
     def _on_param_changed(self):
         self.parameters_changed.emit(self.get_parameters())
 
-    def get_parameters(self) -> dict[str, Any]:
+    def _get_engine_parameters(self) -> dict[str, Any]:
         return {
             "speed": self.speed_slider.scaled_value(),
         }
@@ -462,7 +501,7 @@ class Audio8Controls(EngineControlsBase):
     def _on_param_changed(self):
         self.parameters_changed.emit(self.get_parameters())
 
-    def get_parameters(self) -> dict[str, Any]:
+    def _get_engine_parameters(self) -> dict[str, Any]:
         return {
             "speed": self.speed_slider.scaled_value(),
         }

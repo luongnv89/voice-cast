@@ -129,6 +129,20 @@ class TestSay:
             cloner.say("fail", play_audio=False)
 
 
+class TestGenerate:
+    """VoiceCloner.generate() convenience API tests."""
+
+    def test_optional_playback_preserves_cli_behavior(self, cloner, tmp_path):
+        out = str(tmp_path / "speech.wav")
+        with (
+            patch("voice_cloner.sf.write"),
+            patch("voice_cloner.sd.play") as play,
+            patch("voice_cloner.sd.wait"),
+        ):
+            assert cloner.generate("hello", output_file=out, play_audio=True) == out
+        play.assert_called_once()
+
+
 class TestSavedAudioReadback:
     """Verify saved audio can be read back successfully as audio data."""
 

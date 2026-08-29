@@ -59,8 +59,28 @@ class _UiDelegate:
 
 
 class _VoiceCloner:
-    def say(self, *_args, **_kwargs):
-        pass
+    def __init__(self):
+        self.calls = []
+
+    def generate(self, *args, **kwargs):
+        self.calls.append((args, kwargs))
+
+
+def test_clone_thread_forwards_chunking_parameters(tmp_path, monkeypatch):
+    monkeypatch.setattr(clone_flow_controller.tempfile, "gettempdir", lambda: str(tmp_path))
+    cloner = _VoiceCloner()
+    worker = CloneThread(
+        text="hello",
+        voice_path="voice.wav",
+        engine_name="test",
+        engine_params={"chunk_size": 120, "silence_duration": 350},
+        voice_cloner=cloner,
+    )
+
+    worker.run()
+
+    assert cloner.calls[0][1]["chunk_size"] == 120
+    assert cloner.calls[0][1]["silence_duration"] == 350
 
 
 def test_clone_completion_runs_on_gui_thread(qapp):
