@@ -205,7 +205,7 @@ class CloneFlowController(QObject):
                 - enable_engine_combo()
                 - show_progress()
                 - hide_progress()
-                - set_chunk_progress(current_chunk, total_chunks)
+                - set_chunk_progress(current_chunk, total_chunks) (optional)
                 - get_text_input() -> str
                 - get_voice_path() -> str | None
                 - get_engine_name() -> str
@@ -223,6 +223,9 @@ class CloneFlowController(QObject):
         self._thread_shutdown_requested = False
         self._temp_voice_file = None
         self._cloner_cache = VoiceClonerCache()
+        progress_handler = getattr(ui_delegate, "set_chunk_progress", None)
+        if callable(progress_handler):
+            self.chunk_progress.connect(progress_handler)
 
     @property
     def is_running(self) -> bool:
@@ -369,7 +372,6 @@ class CloneFlowController(QObject):
     def _handle_chunk_progress(self, thread: CloneThread, current_chunk: int, total_chunks: int):
         """Relay progress from the current worker on the GUI thread."""
         if thread is self._thread and not self._shutting_down:
-            self._ui.set_chunk_progress(current_chunk, total_chunks)
             self.chunk_progress.emit(current_chunk, total_chunks)
 
     def _handle_finished(self, thread: CloneThread, output_path: str, text: str):

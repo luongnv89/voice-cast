@@ -30,6 +30,7 @@ class _UiDelegate:
         self.info_thread_id = None
         self.stage_thread_id = None
         self.chunk_progress_calls = []
+        self.chunk_progress_thread_id = None
 
     def enable_generate(self):
         pass
@@ -54,6 +55,7 @@ class _UiDelegate:
 
     def set_chunk_progress(self, current, total):
         self.chunk_progress_calls.append((current, total))
+        self.chunk_progress_thread_id = threading.get_ident()
 
     def info(self, _title, message):
         self.info_calls += 1
@@ -117,6 +119,18 @@ def test_controller_relays_current_worker_progress(qapp):
     assert relayed == [(2, 4)]
 
 
+def test_controller_progress_delegate_is_optional(qapp):
+    controller = CloneFlowController(SimpleNamespace())
+    worker = CloneThread("hello", "voice.wav", "test", {}, _VoiceCloner())
+    relayed = []
+    controller.chunk_progress.connect(lambda current, total: relayed.append((current, total)))
+    controller._thread = worker
+
+    controller._handle_chunk_progress(worker, 1, 2)
+
+    assert relayed == [(1, 2)]
+
+
 def test_clone_completion_runs_on_gui_thread(qapp):
     event_loop = QEventLoop()
     ui = _UiDelegate(event_loop)
@@ -147,6 +161,7 @@ def test_clone_completion_runs_on_gui_thread(qapp):
     assert str(ui.current_audio) in ui.info_message
     assert ui.info_thread_id == gui_thread_id
     assert ui.stage_thread_id == gui_thread_id
+    assert ui.chunk_progress_thread_id == gui_thread_id
 
 
 def test_output_paths_are_unique_and_owned_cleanup_is_collision_safe(qapp, tmp_path, monkeypatch):

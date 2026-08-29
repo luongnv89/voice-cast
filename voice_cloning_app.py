@@ -566,7 +566,7 @@ class VoiceCloningApp(QMainWindow):
         """Show determinate, accessible progress for the active chunk."""
         label = f"Chunk {current_chunk} of {total_chunks}"
         self.progress_bar.setRange(0, total_chunks)
-        self.progress_bar.setValue(current_chunk)
+        self.progress_bar.setValue(current_chunk - 1)
         self.progress_bar.setFormat(label)
         self.progress_bar.setAccessibleName(f"Generation progress: {label}")
         self.set_stage_text(label)
