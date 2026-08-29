@@ -52,7 +52,13 @@ def test_short_text_no_extra_progress_events(mocked_cloner, tmp_path):
     progress = MagicMock()
 
     with patch("voice_cloner.split_into_chunks") as split, patch("voice_cloner.sf.write") as write:
-        cloner.generate("Short", chunk_size=100, output_file=str(tmp_path / "p.wav"), chunk_progress_callback=progress, silence_duration=500)
+        cloner.generate(
+            "Short",
+            chunk_size=100,
+            output_file=str(tmp_path / "p.wav"),
+            chunk_progress_callback=progress,
+            silence_duration=500,
+        )
 
     split.assert_not_called()
     progress.assert_called_once_with(1, 1)
