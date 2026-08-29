@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+import signal
 import sys
 
 from rich.console import Console
@@ -19,7 +20,7 @@ from rich.table import Table
 from models import DownloadProgress, ModelDownloader, get_registry
 from models.exceptions import ModelNotInstalledError
 from tts_factory import TTSFactory, bootstrap_engines
-from voice_cloner import VoiceCloner
+from voice_cloner import GenerationCancelled, VoiceCloner
 
 # Configure logging with Rich for a better terminal experience
 logging.basicConfig(level=logging.INFO, format="%(message)s", handlers=[RichHandler(rich_tracebacks=True)])
@@ -294,42 +295,70 @@ Examples:
         cloner = VoiceCloner(speaker_wav=args.input_voice, engine=selected_engine, auto_download=False)
 
         logger.info("[bold green]Generating speech...[/bold green]")
-        with Progress(
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TimeRemainingColumn(),
-            console=console,
-        ) as progress:
-            task = progress.add_task("Preparing chunks...", total=None)
-            total_chunks = None
+        cancelled = False
+        original_handler = signal.getsignal(signal.SIGINT)
 
-            def update_chunk_progress(current_chunk: int, total: int):
-                nonlocal total_chunks
-                total_chunks = total
-                progress.update(
-                    task,
-                    total=total,
-                    completed=current_chunk - 1,
-                    description=f"Chunk {current_chunk} of {total}",
-                )
+        def _sigint_handler(_signum, _frame):
+            nonlocal cancelled
+            if not cancelled:
+                cancelled = True
+                console.print("\n[yellow]Cancellation requested — finishing current chunk...[/yellow]")
+            else:
+                console.print("\n[red]Force quitting...[/red]")
+                signal.signal(signal.SIGINT, original_handler)
+                raise KeyboardInterrupt
 
-            cloner.generate(
-                args.text,
-                play_audio=not args.no_play,
-                output_file=args.output_file,
-                chunk_size=args.chunk_size,
-                silence_duration=args.silence_duration,
-                chunk_progress_callback=update_chunk_progress,
-                **engine_kwargs,
-            )
-            if total_chunks is not None:
-                progress.update(
-                    task,
-                    completed=total_chunks,
-                    description=f"Chunk {total_chunks} of {total_chunks}",
-                )
+        signal.signal(signal.SIGINT, _sigint_handler)
+        try:
+            with Progress(
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                TimeRemainingColumn(),
+                console=console,
+            ) as progress:
+                task = progress.add_task("Preparing chunks...", total=None)
+                total_chunks = None
 
-        logger.info(f"[bold green]Speech saved to:[/bold green] {args.output_file}")
+                def update_chunk_progress(current_chunk: int, total: int):
+                    nonlocal total_chunks
+                    total_chunks = total
+                    progress.update(
+                        task,
+                        total=total,
+                        completed=current_chunk - 1,
+                        description=f"Chunk {current_chunk} of {total}",
+                    )
+
+                try:
+                    cloner.generate(
+                        args.text,
+                        play_audio=not args.no_play,
+                        output_file=args.output_file,
+                        chunk_size=args.chunk_size,
+                        silence_duration=args.silence_duration,
+                        chunk_progress_callback=update_chunk_progress,
+                        cancel_requested=lambda: cancelled,
+                        **engine_kwargs,
+                    )
+                except GenerationCancelled:
+                    if total_chunks is not None:
+                        progress.update(
+                            task,
+                            completed=total_chunks,
+                            description="Cancelled",
+                        )
+                    console.print(f"[yellow]Generation cancelled. Partial audio saved to {args.output_file}[/yellow]")
+                    sys.exit(130)
+                if total_chunks is not None:
+                    progress.update(
+                        task,
+                        completed=total_chunks,
+                        description=f"Chunk {total_chunks} of {total_chunks}",
+                    )
+
+            logger.info(f"[bold green]Speech saved to:[/bold green] {args.output_file}")
+        finally:
+            signal.signal(signal.SIGINT, original_handler)
 
     except ModelNotInstalledError as e:
         console.print(f"\n[red]Model not installed:[/red] {e.model_id}")
@@ -343,6 +372,11 @@ Examples:
         logger.error(f"[bold red]Missing dependency:[/bold red] {e}")
         logger.info("Install required package with: pip install <package-name>")
         sys.exit(1)
+    except KeyboardInterrupt:
+        console.print("\n[red]Interrupted[/red]")
+        sys.exit(130)
+    except SystemExit:
+        raise
     except Exception as e:
         logger.error(f"[bold red]Error:[/bold red] {e}")
         sys.exit(1)

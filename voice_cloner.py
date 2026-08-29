@@ -42,6 +42,26 @@ logger = logging.getLogger("voice_cloner")
 console = Console()
 
 ChunkProgressCallback = Callable[[int, int], None]
+CancelCheck = Callable[[], bool]
+
+
+class GenerationCancelled(Exception):
+    """Raised when synthesis is cancelled cooperatively between chunks.
+
+    The exception carries the partial audio already synthesised so callers
+    can persist it even though the full text was not completed.
+    """
+
+    def __init__(
+        self,
+        message: str = "Generation cancelled",
+        *,
+        audio: np.ndarray | None = None,
+        sample_rate: int | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.audio = audio
+        self.sample_rate = sample_rate
 
 
 class VoiceCloner:
@@ -236,6 +256,7 @@ class VoiceCloner:
         output_file: str | None = None,
         play_audio: bool = False,
         chunk_progress_callback: ChunkProgressCallback | None = None,
+        cancel_requested: CancelCheck | None = None,
         **kwargs,
     ) -> str:
         """Synthesize text, save the WAV file, and return its path.
@@ -245,6 +266,10 @@ class VoiceCloner:
         ``chunk_size`` is omitted, the configured engine's ``MAX_CHUNK_CHARS``
         is used. ``chunk_progress_callback`` receives the 1-based current chunk
         and stable total immediately before each engine synthesis call.
+        ``cancel_requested`` is an optional callable returning True when
+        synthesis should stop cooperatively between chunks; any already
+        synthesised audio is persisted as a partial file before raising
+        :class:`GenerationCancelled`.
         """
         output_path = self.say(
             text,
@@ -255,11 +280,31 @@ class VoiceCloner:
             chunk_size=chunk_size,
             silence_duration=silence_duration,
             chunk_progress_callback=chunk_progress_callback,
+            cancel_requested=cancel_requested,
             **kwargs,
         )
         if output_path is None:  # pragma: no cover - save_audio=True guarantees a path
             raise RuntimeError("Audio generation did not produce an output path")
         return output_path
+
+    @staticmethod
+    def _concatenate_with_silence(
+        audio_chunks: list[np.ndarray],
+        sample_rate: int,
+        silence_duration: int,
+    ) -> np.ndarray:
+        """Return chunk audio joined with the configured inter-chunk silence."""
+        if silence_duration <= 0 or len(audio_chunks) <= 1:
+            return np.concatenate(audio_chunks, axis=0) if len(audio_chunks) > 1 else audio_chunks[0]
+        silence_samples = int(sample_rate * silence_duration / 1000)
+        silence_shape = (silence_samples, *audio_chunks[0].shape[1:])
+        silence = np.zeros(silence_shape, dtype=audio_chunks[0].dtype)
+        padded: list[np.ndarray] = []
+        for index, chunk_audio in enumerate(audio_chunks):
+            if index:
+                padded.append(silence)
+            padded.append(chunk_audio)
+        return np.concatenate(padded, axis=0)
 
     def say(
         self,
@@ -271,6 +316,7 @@ class VoiceCloner:
         chunk_size: int | None = None,
         silence_duration: int = 200,
         chunk_progress_callback: ChunkProgressCallback | None = None,
+        cancel_requested: CancelCheck | None = None,
         **kwargs,
     ) -> str | None:
         """
@@ -296,6 +342,10 @@ class VoiceCloner:
                 ``(current_chunk, total_chunks)`` immediately before each
                 engine synthesis call. Chunk numbers are 1-based and the total
                 is known and stable before the first callback.
+            cancel_requested: Optional callable returning True when synthesis
+                should stop between chunks. A :class:`GenerationCancelled`
+                is raised after persisting any partial output to
+                ``output_file`` when cancellation is observed.
             **kwargs: Engine-specific parameters (e.g., cfg_weight for Chatterbox).
 
         Returns:
@@ -332,9 +382,12 @@ class VoiceCloner:
                         silence_duration=silence_duration,
                         language=language,
                         chunk_progress_callback=chunk_progress_callback,
+                        cancel_requested=cancel_requested,
                         **kwargs,
                     )
                 else:
+                    if cancel_requested is not None and cancel_requested():
+                        raise GenerationCancelled()
                     audio_data, sample_rate = self._generate_engine_audio(
                         text_to_voice,
                         language=language,
@@ -342,6 +395,8 @@ class VoiceCloner:
                         chunk_progress_callback=chunk_progress_callback,
                         **kwargs,
                     )
+                    if cancel_requested is not None and cancel_requested():
+                        raise GenerationCancelled(audio=audio_data, sample_rate=sample_rate)
 
                 # Save if requested
                 if save_audio and output_file:
@@ -352,7 +407,16 @@ class VoiceCloner:
                 if play_audio:
                     self._play_audio(audio_data, sample_rate)
 
+            except GenerationCancelled as cancelled:
+                if save_audio and output_file and cancelled.audio is not None and cancelled.sample_rate is not None:
+                    try:
+                        sf.write(output_file, cancelled.audio, cancelled.sample_rate)
+                        logger.info(f"Partial audio saved to {output_file} (cancelled)")
+                    except Exception:
+                        pass
+                raise
             except Exception as e:
+                # GenerationCancelled is already handled above; avoid double-logging it.
                 logger.error(f"Error during TTS generation: {e}")
                 raise
 
@@ -365,6 +429,7 @@ class VoiceCloner:
         silence_duration: int,
         language: str,
         chunk_progress_callback: ChunkProgressCallback | None = None,
+        cancel_requested: CancelCheck | None = None,
         **kwargs,
     ):
         """
@@ -385,6 +450,8 @@ class VoiceCloner:
             RuntimeError: If the engine returns different sample rates for
                 different chunks, which would garble the concatenated audio.
         """
+        if cancel_requested is not None and cancel_requested():
+            raise GenerationCancelled()
         chunks = split_into_chunks(text, chunk_size)
         if not chunks:
             # Empty or whitespace-only text: fall back to a single engine call
@@ -403,6 +470,11 @@ class VoiceCloner:
         sample_rate: int | None = None
         total_chunks = len(chunks)
         for index, chunk in enumerate(chunks):
+            if cancel_requested is not None and cancel_requested():
+                if not audio_chunks or sample_rate is None:
+                    raise GenerationCancelled()
+                partial = self._concatenate_with_silence(audio_chunks, sample_rate, silence_duration)
+                raise GenerationCancelled(audio=partial, sample_rate=sample_rate)
             chunk_audio, chunk_rate = self._generate_engine_audio(
                 chunk,
                 language=language,
@@ -431,18 +503,12 @@ class VoiceCloner:
                 )
             audio_chunks.append(chunk_audio)
 
-        if silence_duration > 0 and len(audio_chunks) > 1:
-            silence_samples = int(sample_rate * silence_duration / 1000)
-            silence_shape = (silence_samples, *audio_chunks[0].shape[1:])
-            silence = np.zeros(silence_shape, dtype=audio_chunks[0].dtype)
-            padded = []
-            for index, chunk_audio in enumerate(audio_chunks):
-                if index:
-                    padded.append(silence)
-                padded.append(chunk_audio)
-            audio_chunks = padded
+        if cancel_requested is not None and cancel_requested():
+            partial = self._concatenate_with_silence(audio_chunks, sample_rate, silence_duration)
+            raise GenerationCancelled(audio=partial, sample_rate=sample_rate)
 
-        return np.concatenate(audio_chunks, axis=0), sample_rate
+        concatenated = self._concatenate_with_silence(audio_chunks, sample_rate, silence_duration)
+        return concatenated, sample_rate
 
     def _play_audio(self, audio_data, sample_rate: int):
         """

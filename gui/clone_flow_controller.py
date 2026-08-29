@@ -18,7 +18,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, Qt, QThread, Signal, Slot
 from PySide6.QtWidgets import QMessageBox
 
-from voice_cloner import VoiceCloner
+from voice_cloner import GenerationCancelled, VoiceCloner
 
 logger = logging.getLogger("voice_cloner.gui.clone_flow")
 
@@ -77,6 +77,7 @@ class CloneThread(QThread):
     """Thread for running TTS generation without blocking the UI."""
 
     completed = Signal(str, str)
+    cancelled = Signal(str)
     error_occurred = Signal(str)
     stage_changed = Signal(str)
     chunk_progress = Signal(int, int)
@@ -159,20 +160,32 @@ class CloneThread(QThread):
                 self.text,
                 output_file=str(self.output_path),
                 chunk_progress_callback=self.chunk_progress.emit,
+                cancel_requested=self.isInterruptionRequested,
                 **self.engine_params,
             )
             self._record_output_ownership()
             if self.isInterruptionRequested():
                 self.outcome = "cancelled"
+                self.keep_output = True
+                self.cancelled.emit(str(self.output_path) if self.output_path else "")
                 return
             self.outcome = "completed"
             self.completed.emit(str(self.output_path), self.text)
+        except GenerationCancelled:
+            self._record_output_ownership()
+            self.outcome = "cancelled"
+            self.keep_output = True
+            self.cancelled.emit(str(self.output_path) if self.output_path and self.output_path.exists() else "")
+            return
         except Exception as e:
             self._record_output_ownership()
             interrupted = self.isInterruptionRequested()
             self.outcome = "cancelled" if interrupted else "failed"
-            if not interrupted:
-                self.error_occurred.emit(str(e))
+            if interrupted:
+                self.keep_output = True
+                self.cancelled.emit(str(self.output_path) if self.output_path and self.output_path.exists() else "")
+                return
+            self.error_occurred.emit(str(e))
 
 
 class CloneFlowController(QObject):
@@ -253,6 +266,21 @@ class CloneFlowController(QObject):
         self._thread_shutdown_requested = True
         thread.requestInterruption()
 
+    def cancel(self):
+        """Request cancellation from the Cancel button (cooperative, between chunks)."""
+        thread = self._thread
+        if thread is None or not thread.isRunning():
+            return
+        # Update UI to reflect pending cancellation; actual reset happens
+        # when the worker emits cancelled and then finished.
+        with contextlib.suppress(Exception):
+            self._ui.set_stage_text("Cancelling...")
+            if hasattr(self._ui, "set_generate_text"):
+                self._ui.set_generate_text("Cancelling...")
+            if hasattr(self._ui, "disable_cancel"):
+                self._ui.disable_cancel()
+        thread.requestInterruption()
+
     def start(self) -> bool:
         """Start the voice cloning process.
 
@@ -321,6 +349,9 @@ class CloneFlowController(QObject):
         self._ui.disable_voice_select()
         self._ui.disable_engine_combo()
         self._ui.show_progress()
+        with contextlib.suppress(Exception):
+            if hasattr(self._ui, "show_cancel"):
+                self._ui.show_cancel()
 
         # Get engine parameters and start thread
         engine_params = self._ui.get_engine_params() if hasattr(self._ui, "get_engine_params") else {}
@@ -349,6 +380,10 @@ class CloneFlowController(QObject):
         self._connect_queued(
             thread.completed,
             lambda output_path, text, worker=thread: self._handle_finished(worker, output_path, text),
+        )
+        self._connect_queued(
+            thread.cancelled,
+            lambda output_path, worker=thread: self._handle_cancelled(worker, output_path),
         )
         self._connect_queued(
             thread.error_occurred,
@@ -380,6 +415,13 @@ class CloneFlowController(QObject):
             return
         thread.keep_output = True
         self._on_finished(output_path, text)
+
+    def _handle_cancelled(self, thread: CloneThread, output_path: str):
+        """Handle cooperative cancellation from the current worker."""
+        if thread is not self._thread or self._shutting_down:
+            return
+        thread.keep_output = True
+        self._on_cancelled(output_path)
 
     def _handle_error(self, thread: CloneThread, message: str):
         """Handle errors only for the current, non-shutting-down worker."""
@@ -435,6 +477,25 @@ class CloneFlowController(QObject):
         self._reset_ui()
         self._ui.critical("Generation Error", f"Failed to generate audio:\n\n{message}")
 
+    @Slot(str)
+    def _on_cancelled(self, output_path: str):
+        """Handle cooperative cancellation — keep partial output and inform the user."""
+        if self._shutting_down:
+            return
+        if output_path:
+            self._ui.current_audio = output_path
+            self._ui.show_play_save()
+        self._reset_ui()
+        self._ui.info(
+            "Generation Cancelled",
+            f"Generation was cancelled.\n\nPartial audio: {output_path}"
+            if output_path
+            else "Generation was cancelled.",
+        )
+        with contextlib.suppress(Exception):
+            if hasattr(self._ui, "set_stage_text"):
+                self._ui.set_stage_text("Cancelled")
+
     def _reset_ui(self):
         """Reset UI to normal state after generation."""
         self._ui.enable_generate()
@@ -442,6 +503,9 @@ class CloneFlowController(QObject):
         self._ui.enable_voice_select()
         self._ui.enable_engine_combo()
         self._ui.hide_progress()
+        with contextlib.suppress(Exception):
+            if hasattr(self._ui, "hide_cancel"):
+                self._ui.hide_cancel()
 
     def _cleanup_temp(self, temp_voice_file: str | None = None):
         """Clean up the temporary voice file owned by a completed run."""
