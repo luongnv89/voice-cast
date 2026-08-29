@@ -58,7 +58,7 @@ class CoquiEngine(TTSEngineBase):
     """TTS engine using Coqui TTS (XTTS v2)."""
 
     # Conservative application-level limit for XTTS v2 text prompts.
-    MAX_CHUNK_CHARS = 240
+    MAX_CHUNK_CHARS: int = 240
 
     SUPPORTED_LANGUAGES = [
         "en",

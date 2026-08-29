@@ -21,6 +21,30 @@ ENGINE_LIMITS = [
 ]
 
 
+class _LegacyEngine:
+    name = "legacy"
+    requires_reference_audio = False
+
+    def __init__(self):
+        self.calls = []
+
+    def generate(self, text, language="en"):
+        self.calls.append((text, language))
+        return np.array([0.5], dtype=np.float32), 1000
+
+
+class _KwargsEngine:
+    name = "kwargs"
+    requires_reference_audio = False
+
+    def __init__(self):
+        self.calls = []
+
+    def generate(self, text, language="en", **kwargs):
+        self.calls.append((text, language, kwargs))
+        return np.array([0.5], dtype=np.float32), 1000
+
+
 @pytest.fixture
 def chunking_cloner():
     engine = MagicMock()
@@ -46,6 +70,34 @@ def test_concrete_generate_methods_accept_chunk_size(engine_class, _expected_lim
     parameter = inspect.signature(engine_class.generate).parameters["chunk_size"]
     assert parameter.default is None
     assert parameter.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD
+
+
+def test_explicit_override_preserves_legacy_custom_engine(tmp_path):
+    engine = _LegacyEngine()
+    cloner = VoiceCloner(speaker_wav="", engine=engine)
+    output_file = str(tmp_path / "legacy.wav")
+
+    with (
+        patch("voice_cloner.split_into_chunks", return_value=["One.", "Two."]),
+        patch("voice_cloner.sf.write"),
+    ):
+        cloner.generate("One. Two.", chunk_size=5, output_file=output_file)
+
+    assert engine.calls == [("One.", "en"), ("Two.", "en")]
+
+
+def test_explicit_override_reaches_custom_kwargs_engine(tmp_path):
+    engine = _KwargsEngine()
+    cloner = VoiceCloner(speaker_wav="", engine=engine)
+    output_file = str(tmp_path / "kwargs.wav")
+
+    with (
+        patch("voice_cloner.split_into_chunks", return_value=["One.", "Two."]),
+        patch("voice_cloner.sf.write"),
+    ):
+        cloner.generate("One. Two.", chunk_size=5, output_file=output_file)
+
+    assert [call[2]["chunk_size"] for call in engine.calls] == [5, 5]
 
 
 def test_generate_uses_engine_default_and_forwards_it(chunking_cloner, tmp_path):

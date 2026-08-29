@@ -45,7 +45,7 @@ class Audio8Engine(TTSEngineBase):
     """TTS engine using Audio8 ONNX model for voice cloning."""
 
     # Conservative application-level limit for Audio8 prompts.
-    MAX_CHUNK_CHARS = 200
+    MAX_CHUNK_CHARS: int = 200
 
     SUPPORTED_LANGUAGES = ["en"]
 

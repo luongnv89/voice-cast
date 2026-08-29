@@ -108,7 +108,7 @@ class MlxAudioEngine(TTSEngineBase):
     """TTS engine using MLX Audio for Apple Silicon."""
 
     # Shared conservative limit for the Kokoro and CSM variants.
-    MAX_CHUNK_CHARS = 200
+    MAX_CHUNK_CHARS: int = 200
 
     # Supported languages depend on variant
     KOKORO_LANGUAGES = list(KOKORO_VOICES.keys())

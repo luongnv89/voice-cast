@@ -25,7 +25,7 @@ class ChatterboxEngine(TTSEngineBase):
     """TTS engine using Chatterbox by Resemble AI."""
 
     # Conservative application-level limit for Chatterbox prompts.
-    MAX_CHUNK_CHARS = 100
+    MAX_CHUNK_CHARS: int = 100
 
     # Languages supported by multilingual features (when available)
     SUPPORTED_LANGUAGES = ["en"]  # Base Chatterbox is English-focused

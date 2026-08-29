@@ -1,4 +1,5 @@
 import contextlib
+import inspect
 import logging
 import os
 import warnings
@@ -199,7 +200,23 @@ class VoiceCloner:
         """Call the engine with the effective chunking contract."""
         if chunk_size is None:
             return self.engine.generate(text=text, language=language, **kwargs)
-        return self.engine.generate(text=text, language=language, chunk_size=chunk_size, **kwargs)
+
+        try:
+            generate_parameters = inspect.signature(self.engine.generate).parameters
+        except (TypeError, ValueError):
+            # Unknown callables are treated as current-interface engines.
+            generate_parameters = {}
+            accepts_chunk_size = True
+        else:
+            accepts_chunk_size = "chunk_size" in generate_parameters or any(
+                parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in generate_parameters.values()
+            )
+        if accepts_chunk_size:
+            return self.engine.generate(text=text, language=language, chunk_size=chunk_size, **kwargs)
+
+        # Preserve compatibility with older custom engines that predate the
+        # shared chunk_size parameter. VoiceCloner still enforces the limit.
+        return self.engine.generate(text=text, language=language, **kwargs)
 
     def generate(
         self,
