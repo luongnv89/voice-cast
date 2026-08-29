@@ -103,6 +103,68 @@ class TestCliSuccessPathsDoNotExit:
             assert run_main(["-i", "voice.wav", "-t", "hi", "-o", str(out)]) is None
         mock_cloner.assert_called_once()
         cloner.say.assert_called_once()
+        assert cloner.say.call_args.kwargs["chunk_size"] is None
+        assert cloner.say.call_args.kwargs["silence_duration"] == 200
+        assert cloner.say.call_args.kwargs["play_audio"] is True
+
+    def test_generation_forwards_chunking_overrides(self, tmp_path):
+        cloner = MagicMock()
+        out = tmp_path / "out.wav"
+        with (
+            patch("vcloner.bootstrap_engines"),
+            patch("vcloner.TTSFactory.available_engines", return_value=["coqui"]),
+            patch("vcloner.VoiceCloner", return_value=cloner),
+        ):
+            run_main(
+                [
+                    "-i",
+                    "voice.wav",
+                    "-t",
+                    "hi",
+                    "-o",
+                    str(out),
+                    "--chunk-size",
+                    "120",
+                    "--silence-duration",
+                    "350",
+                    "--no-play",
+                ]
+            )
+
+        assert cloner.say.call_args.kwargs["chunk_size"] == 120
+        assert cloner.say.call_args.kwargs["silence_duration"] == 350
+        assert cloner.say.call_args.kwargs["play_audio"] is False
+
+    def test_help_documents_chunking_options(self, capsys):
+        with (
+            patch("vcloner.bootstrap_engines"),
+            patch("vcloner.TTSFactory.available_engines", return_value=["coqui"]),
+            pytest.raises(SystemExit) as excinfo,
+        ):
+            run_main(["--help"])
+
+        assert excinfo.value.code == 0
+        help_text = " ".join(capsys.readouterr().out.split())
+        assert "--silence-duration MS" in help_text
+        assert "Default: 200" in help_text
+        assert "--chunk-size CHARS" in help_text
+        assert "Default: selected engine limit" in help_text
+
+    @pytest.mark.parametrize(
+        "invalid_option",
+        [
+            ["--silence-duration", "-1"],
+            ["--chunk-size", "0"],
+        ],
+    )
+    def test_chunking_options_reject_invalid_values(self, invalid_option):
+        with (
+            patch("vcloner.bootstrap_engines"),
+            patch("vcloner.TTSFactory.available_engines", return_value=["coqui"]),
+            pytest.raises(SystemExit) as excinfo,
+        ):
+            run_main(invalid_option)
+        assert excinfo.value.code == 2
 
 
 class TestSharedRegistrySites:

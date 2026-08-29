@@ -21,6 +21,9 @@
   `VoiceCloner` and can be overridden per synthesis call with `chunk_size`;
   the effective limit is propagated through every engine's `generate()` API
   (#130, #131, #132).
+- GUI engine controls now expose the silence between text chunks, and the CLI
+  accepts `--silence-duration` and `--chunk-size` overrides while preserving
+  each engine's default chunk limit (#139, #142).
 
 ### Fixed
 

@@ -7,6 +7,7 @@ pytest.importorskip("PySide6")
 from PySide6.QtCore import QCoreApplication  # noqa: E402
 
 from gui.engine_controls import (  # noqa: E402
+    Audio8Controls,
     ChatterboxControls,
     CoquiControls,
     EngineControlsBase,
@@ -80,6 +81,15 @@ def register_test_engines():
             controls_class=MlxCsmControls,
         )
     )
+    TTSFactory.register(
+        EngineDescriptor(
+            name="audio8-onnx",
+            engine_class=StubEngine,
+            display_name="Audio8 TTS (1B)",
+            requires_reference_audio=True,
+            controls_class=Audio8Controls,
+        )
+    )
     yield
     TTSFactory._registry.clear()
 
@@ -97,10 +107,10 @@ def qapp():
 class TestEngineControlsBase:
     """Tests for EngineControlsBase (fallback for unknown engines)."""
 
-    def test_base_get_parameters_returns_empty_dict(self, qapp):
+    def test_base_get_parameters_includes_chunk_silence(self, qapp):
         controls = EngineControlsBase()
         params = controls.get_parameters()
-        assert params == {}
+        assert params == {"silence_duration": 200}
 
     def test_base_parameters_changed_signal(self, qapp):
         controls = EngineControlsBase()
@@ -113,9 +123,9 @@ class TestEngineControlsBase:
         controls.parameters_changed.emit({})
         assert emitted == [{}]
 
-    def test_base_returns_empty_params_for_unknown_engine_via_factory(self, qapp):
+    def test_base_returns_chunk_silence_for_unknown_engine_via_factory(self, qapp):
         controls = EngineControlsFactory.create("nonexistent-engine")
-        assert controls.get_parameters() == {}
+        assert controls.get_parameters() == {"silence_duration": 200}
 
 
 class TestEngineControlsFactory:
@@ -143,6 +153,10 @@ class TestEngineControlsFactory:
         controls = EngineControlsFactory.create("mlx-csm")
         assert isinstance(controls, MlxCsmControls)
 
+    def test_create_audio8(self, qapp):
+        controls = EngineControlsFactory.create("audio8-onnx")
+        assert isinstance(controls, Audio8Controls)
+
     def test_create_unknown_engine_returns_base(self, qapp):
         controls = EngineControlsFactory.create("unknown-engine")
         assert isinstance(controls, EngineControlsBase)
@@ -150,7 +164,7 @@ class TestEngineControlsFactory:
     def test_create_unknown_engine_get_parameters(self, qapp):
         controls = EngineControlsFactory.create("unknown-engine")
         params = controls.get_parameters()
-        assert params == {}
+        assert params == {"silence_duration": 200}
 
 
 class TestKnownEngineControls:
@@ -164,6 +178,7 @@ class TestKnownEngineControls:
             ("chatterbox-standard", ChatterboxControls),
             ("mlx-kokoro", MlxKokoroControls),
             ("mlx-csm", MlxCsmControls),
+            ("audio8-onnx", Audio8Controls),
         ],
     )
     def test_known_engines_return_dict(self, qapp, engine_name, expected_type):
@@ -171,6 +186,32 @@ class TestKnownEngineControls:
         assert isinstance(controls, expected_type)
         params = controls.get_parameters()
         assert isinstance(params, dict)
+
+    @pytest.mark.parametrize(
+        "engine_name",
+        [
+            "coqui",
+            "chatterbox-turbo",
+            "chatterbox-standard",
+            "mlx-kokoro",
+            "mlx-csm",
+            "audio8-onnx",
+        ],
+    )
+    def test_known_engines_default_to_200ms_chunk_silence(self, qapp, engine_name):
+        controls = EngineControlsFactory.create(engine_name)
+        assert controls.get_parameters()["silence_duration"] == 200
+
+    def test_silence_change_emits_complete_parameter_payload(self, qapp):
+        controls = EngineControlsFactory.create("coqui")
+        emitted = []
+        controls.parameters_changed.connect(emitted.append)
+
+        controls.silence_duration_spin.setValue(350)
+
+        assert emitted[-1]["language"] == "en"
+        assert emitted[-1]["temperature"] == pytest.approx(0.7)
+        assert emitted[-1]["silence_duration"] == 350
 
 
 class TestMlxVoiceMetadata:

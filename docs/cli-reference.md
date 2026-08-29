@@ -41,6 +41,8 @@ vcloner --help
 |----------|-------|---------|-------------|
 | `--engine` | `-e` | `coqui` | TTS engine to use |
 | `--language` | `-l` | `en` | Language code |
+| `--silence-duration` | | `200` | Milliseconds of silence inserted between text chunks |
+| `--chunk-size` | | engine limit | Maximum characters per text chunk; omit to use the selected engine's default |
 | `--no-play` | | | Don't play audio after generation |
 | `--list-engines` | | | List available engines and exit |
 | `--list-models` | | | List available models, sizes, and cache status |
@@ -183,6 +185,24 @@ python vcloner.py \
     --engine chatterbox-turbo \
     --cfg-weight 0.2
 ```
+
+### Control Long-Text Chunking
+
+Override the selected engine's default chunk size and the silence inserted
+between chunks:
+
+```bash
+python vcloner.py \
+    -i ./voice-samples/speaker.wav \
+    -t "A long passage to synthesize." \
+    -o long-form.wav \
+    --chunk-size 180 \
+    --silence-duration 300
+```
+
+`--chunk-size` must be greater than zero. `--silence-duration` is measured in
+milliseconds and may be zero. Omitting `--chunk-size` preserves the selected
+engine's built-in limit.
 
 ### Generate Without Playback
 

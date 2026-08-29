@@ -20,6 +20,22 @@ logger = logging.getLogger("voice_cloner")
 console = Console()
 
 
+def positive_int(value: str) -> int:
+    """Parse a strictly positive integer CLI value."""
+    parsed = int(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be greater than 0")
+    return parsed
+
+
+def non_negative_int(value: str) -> int:
+    """Parse a non-negative integer CLI value."""
+    parsed = int(value)
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("must be 0 or greater")
+    return parsed
+
+
 def list_models():
     """Display a table of all available models and their status."""
     registry = get_registry()
@@ -158,6 +174,20 @@ Examples:
     parser.add_argument(
         "-l", "--language", default="en", help="Language code (default: en). For Coqui: en, es, fr, de, etc."
     )
+    parser.add_argument(
+        "--silence-duration",
+        type=non_negative_int,
+        default=200,
+        metavar="MS",
+        help="Silence between text chunks in milliseconds. Default: 200",
+    )
+    parser.add_argument(
+        "--chunk-size",
+        type=positive_int,
+        default=None,
+        metavar="CHARS",
+        help="Maximum characters per text chunk. Default: selected engine limit",
+    )
 
     # Coqui-specific arguments
     parser.add_argument(
@@ -257,7 +287,13 @@ Examples:
 
         logger.info("[bold green]Generating speech...[/bold green]")
         cloner.say(
-            args.text, play_audio=not args.no_play, save_audio=True, output_file=args.output_file, **engine_kwargs
+            args.text,
+            play_audio=not args.no_play,
+            save_audio=True,
+            output_file=args.output_file,
+            chunk_size=args.chunk_size,
+            silence_duration=args.silence_duration,
+            **engine_kwargs,
         )
 
         logger.info(f"[bold green]Speech saved to:[/bold green] {args.output_file}")

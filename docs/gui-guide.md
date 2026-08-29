@@ -34,6 +34,7 @@ The voice cloning tab is organized into sections:
 |                                                  |
 |  Engine Parameters (varies by engine)            |
 |  Language: [en v]  Temperature: [===|====]       |
+|  Silence between chunks: [200 ms]                |
 +--------------------------------------------------+
 |  Text Input                                      |
 |  +----------------------------------------------+|
@@ -81,6 +82,10 @@ Parameters change based on selected engine:
 **Chatterbox Turbo/Standard:**
 - **CFG Weight**: Text adherence (lower for fast speakers)
 - **Exaggeration**: Expressiveness (higher for dramatic speech)
+
+**All engines:**
+- **Silence between chunks**: Pause inserted between long-text chunks in
+  milliseconds (default: 200 ms; set to 0 for no pause)
 
 ### 4. Enter Text
 
@@ -185,10 +190,9 @@ English (en), Spanish (es), French (fr), German (de), Italian (it), Portuguese (
 
 ### Long Content
 
-For longer texts:
-1. Break into paragraphs
-2. Generate each separately
-3. Adjust parameters per section if needed
+VoiceCast automatically uses the selected engine's chunk-size limit for long
+text. Adjust **Silence between chunks** to control pacing at chunk boundaries;
+short text is still synthesized in one call.
 
 ### Voice Matching
 
