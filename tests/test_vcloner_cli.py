@@ -102,10 +102,10 @@ class TestCliSuccessPathsDoNotExit:
         ):
             assert run_main(["-i", "voice.wav", "-t", "hi", "-o", str(out)]) is None
         mock_cloner.assert_called_once()
-        cloner.say.assert_called_once()
-        assert cloner.say.call_args.kwargs["chunk_size"] is None
-        assert cloner.say.call_args.kwargs["silence_duration"] == 200
-        assert cloner.say.call_args.kwargs["play_audio"] is True
+        cloner.generate.assert_called_once()
+        assert cloner.generate.call_args.kwargs["chunk_size"] is None
+        assert cloner.generate.call_args.kwargs["silence_duration"] == 200
+        assert cloner.generate.call_args.kwargs["play_audio"] is True
 
     def test_generation_forwards_chunking_overrides(self, tmp_path):
         cloner = MagicMock()
@@ -131,9 +131,9 @@ class TestCliSuccessPathsDoNotExit:
                 ]
             )
 
-        assert cloner.say.call_args.kwargs["chunk_size"] == 120
-        assert cloner.say.call_args.kwargs["silence_duration"] == 350
-        assert cloner.say.call_args.kwargs["play_audio"] is False
+        assert cloner.generate.call_args.kwargs["chunk_size"] == 120
+        assert cloner.generate.call_args.kwargs["silence_duration"] == 350
+        assert cloner.generate.call_args.kwargs["play_audio"] is False
 
     def test_help_documents_chunking_options(self, capsys):
         with (

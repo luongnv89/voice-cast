@@ -286,10 +286,9 @@ Examples:
         cloner = VoiceCloner(speaker_wav=args.input_voice, engine=selected_engine, auto_download=False)
 
         logger.info("[bold green]Generating speech...[/bold green]")
-        cloner.say(
+        cloner.generate(
             args.text,
             play_audio=not args.no_play,
-            save_audio=True,
             output_file=args.output_file,
             chunk_size=args.chunk_size,
             silence_duration=args.silence_duration,

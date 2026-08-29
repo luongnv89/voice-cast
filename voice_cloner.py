@@ -225,18 +225,20 @@ class VoiceCloner:
         chunk_size: int | None = None,
         silence_duration: int = 200,
         output_file: str | None = None,
+        play_audio: bool = False,
         **kwargs,
     ) -> str:
         """Synthesize text, save the WAV file, and return its path.
 
-        This convenience API always saves the generated audio and never plays
-        it. Chunking uses the same controls as :meth:`say`; when ``chunk_size``
-        is omitted, the configured engine's ``MAX_CHUNK_CHARS`` is used.
+        This convenience API always saves the generated audio and optionally
+        plays it. Chunking uses the same controls as :meth:`say`; when
+        ``chunk_size`` is omitted, the configured engine's ``MAX_CHUNK_CHARS``
+        is used.
         """
         output_path = self.say(
             text,
             language=language,
-            play_audio=False,
+            play_audio=play_audio,
             save_audio=True,
             output_file=output_file,
             chunk_size=chunk_size,

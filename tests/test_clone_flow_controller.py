@@ -62,7 +62,7 @@ class _VoiceCloner:
     def __init__(self):
         self.calls = []
 
-    def say(self, *args, **kwargs):
+    def generate(self, *args, **kwargs):
         self.calls.append((args, kwargs))
 
 
