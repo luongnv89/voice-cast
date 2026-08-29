@@ -4,21 +4,21 @@ Covers GUI and CLI adapter paths with a mocked engine so CI never needs
 torch/TTS. Mirrors the acceptance criteria of issue #144.
 """
 
-import tempfile
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
+import soundfile as sf
 
 pytest.importorskip("PySide6")
 
-from PySide6.QtCore import QEventLoop, QTimer  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
+import vcloner  # noqa: E402
 from gui.clone_flow_controller import CloneFlowController, CloneThread  # noqa: E402
 from voice_cloner import GenerationCancelled, VoiceCloner  # noqa: E402
-import vcloner  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -86,9 +86,10 @@ def test_long_text_with_progress_via_voice_cloner(tmp_path):
     def cb(c, t):
         events.append((c, t))
 
-    with patch("voice_cloner.split_into_chunks", return_value=["a", "b", "c"]):
-        with patch("voice_cloner.sf.write") as write:
-            cloner.generate("long text long text", chunk_size=10, output_file=str(tmp_path / "out.wav"), chunk_progress_callback=cb)
+    with patch("voice_cloner.split_into_chunks", return_value=["a", "b", "c"]), patch("voice_cloner.sf.write") as write:
+        cloner.generate(
+            "long text long text", chunk_size=10, output_file=str(tmp_path / "out.wav"), chunk_progress_callback=cb
+        )
 
     assert events == [(1, 3), (2, 3), (3, 3)]
     assert engine.generate.call_count == 3
@@ -115,7 +116,6 @@ def test_cancellation_produces_partial_output(tmp_path):
 
     assert engine.generate.call_count == 1
     assert Path(out).exists()
-    import soundfile as sf
 
     data, sr = sf.read(out)
     assert sr == 1000
@@ -158,9 +158,10 @@ def test_gui_chunk_progress_and_cancel(qapp, tmp_path):
         def cancel_after_first2():
             return engine2.generate.call_count >= 1
 
-        with pytest.raises(GenerationCancelled):
-            with patch("voice_cloner.split_into_chunks", return_value=["x", "y"]):
-                cloner2.generate("long text long text", chunk_size=10, output_file=out, cancel_requested=cancel_after_first2)
+        with pytest.raises(GenerationCancelled), patch("voice_cloner.split_into_chunks", return_value=["x", "y"]):
+            cloner2.generate(
+                "long text long text", chunk_size=10, output_file=out, cancel_requested=cancel_after_first2
+            )
         assert Path(out).exists()
 
 
@@ -173,7 +174,17 @@ def test_cli_progress_and_cancel_via_vcloner(tmp_path, monkeypatch):
         def __init__(self, *args, **kwargs):
             pass
 
-        def generate(self, text, play_audio=True, output_file=None, chunk_size=None, silence_duration=200, chunk_progress_callback=None, cancel_requested=None, **kwargs):
+        def generate(
+            self,
+            text,
+            play_audio=True,
+            output_file=None,
+            chunk_size=None,
+            silence_duration=200,
+            chunk_progress_callback=None,
+            cancel_requested=None,
+            **kwargs,
+        ):
             captured["cancel"] = cancel_requested
             captured["progress"] = chunk_progress_callback
             # Simulate chunked progress: 2 chunks, cancel after first
@@ -187,9 +198,6 @@ def test_cli_progress_and_cancel_via_vcloner(tmp_path, monkeypatch):
             if cancel_requested and cancel_requested():
                 raise GenerationCancelled(audio=np.array([1.0], dtype=np.float32), sample_rate=1000)
             # Write dummy file to satisfy CLI expectation if not cancelled
-            import soundfile as sf
-            import numpy as np
-
             sf.write(output_file, np.array([1.0, 2.0], dtype=np.float32), 1000)
             return output_file
 
@@ -204,15 +212,15 @@ def test_cli_progress_and_cancel_via_vcloner(tmp_path, monkeypatch):
 
     out = tmp_path / "cli_out.wav"
     # First, test normal progress rendering without cancellation
-    with patch("vcloner.bootstrap_engines"), patch("vcloner.TTSFactory.available_engines", return_value=["coqui"]), patch(
-        "vcloner.VoiceCloner", FakeCloner
-    ), patch("vcloner.Progress", return_value=mock_context), patch("vcloner.signal.signal"):
-        # Simulate running with no cancellation (cancel flag always False)
-        # Need to run main with args
-        import sys
-
-        with patch.object(sys, "argv", ["vcloner.py", "-i", "voice.wav", "-t", "long text", "-o", str(out)]):
-            vcloner.main()
+    with (
+        patch("vcloner.bootstrap_engines"),
+        patch("vcloner.TTSFactory.available_engines", return_value=["coqui"]),
+        patch("vcloner.VoiceCloner", FakeCloner),
+        patch("vcloner.Progress", return_value=mock_context),
+        patch("vcloner.signal.signal"),
+        patch.object(sys, "argv", ["vcloner.py", "-i", "voice.wav", "-t", "long text", "-o", str(out)]),
+    ):
+        vcloner.main()
 
     assert len(progress_updates) >= 2
     # Verify first update had total=2

@@ -412,8 +412,8 @@ class VoiceCloner:
                     try:
                         sf.write(output_file, cancelled.audio, cancelled.sample_rate)
                         logger.info(f"Partial audio saved to {output_file} (cancelled)")
-                    except Exception:
-                        pass
+                    except Exception as write_error:  # nosec B110 - best-effort partial persist, failure is non-fatal
+                        logger.debug(f"Failed to write partial audio on cancellation: {write_error}")
                 raise
             except Exception as e:
                 # GenerationCancelled is already handled above; avoid double-logging it.
