@@ -24,6 +24,9 @@ CHATTERBOX_MODEL_IDS = {
 class ChatterboxEngine(TTSEngineBase):
     """TTS engine using Chatterbox by Resemble AI."""
 
+    # Conservative application-level limit for Chatterbox prompts.
+    MAX_CHUNK_CHARS = 100
+
     # Languages supported by multilingual features (when available)
     SUPPORTED_LANGUAGES = ["en"]  # Base Chatterbox is English-focused
 
@@ -106,7 +109,13 @@ class ChatterboxEngine(TTSEngineBase):
         return self._sample_rate
 
     def generate(
-        self, text: str, language: str = "en", cfg_weight: float = 0.5, exaggeration: float = 0.5, **kwargs
+        self,
+        text: str,
+        language: str = "en",
+        cfg_weight: float = 0.5,
+        exaggeration: float = 0.5,
+        chunk_size: int | None = None,
+        **kwargs,
     ) -> tuple[np.ndarray, int]:
         """
         Generate audio using Chatterbox.
@@ -116,6 +125,7 @@ class ChatterboxEngine(TTSEngineBase):
             language: Language code (primarily "en" for base models).
             cfg_weight: CFG weight (0.0-1.0). Lower values = better pacing for fast speakers.
             exaggeration: Expressiveness (0.0-1.5). Higher = more dramatic.
+            chunk_size: Effective character limit selected by VoiceCloner.
 
         Returns:
             Tuple of (audio_data, sample_rate)

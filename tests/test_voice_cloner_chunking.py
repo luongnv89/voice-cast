@@ -14,6 +14,7 @@ def mocked_cloner():
     engine = MagicMock()
     engine.name = "mock_engine"
     engine.requires_reference_audio = False
+    engine.MAX_CHUNK_CHARS = 0
     engine.generate.return_value = (np.array([0.5], dtype=np.float32), 1000)
     return VoiceCloner(speaker_wav="", engine=engine), engine
 
@@ -39,7 +40,7 @@ class TestVoiceClonerChunking:
 
         split.assert_called_once_with(text, 32)
         assert [call.kwargs["text"] for call in engine.generate.call_args_list] == chunks
-        assert all("chunk_size" not in call.kwargs for call in engine.generate.call_args_list)
+        assert all(call.kwargs["chunk_size"] == 32 for call in engine.generate.call_args_list)
         assert all("silence_duration" not in call.kwargs for call in engine.generate.call_args_list)
         expected = np.concatenate(
             [
@@ -65,7 +66,7 @@ class TestVoiceClonerChunking:
             result = cloner.generate(text, chunk_size=100, output_file=output_file)
 
         split.assert_not_called()
-        engine.generate.assert_called_once_with(text=text, language="en")
+        engine.generate.assert_called_once_with(text=text, language="en", chunk_size=100)
         assert result == output_file
 
     def test_generate_supports_zero_silence_duration(self, mocked_cloner, tmp_path):

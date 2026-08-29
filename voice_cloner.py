@@ -178,6 +178,29 @@ class VoiceCloner:
         if silence_duration < 0:
             raise ValueError(f"silence_duration must be a non-negative integer, got {silence_duration}")
 
+    @staticmethod
+    def _resolve_chunk_size(engine: TTSEngineBase, chunk_size: int | None) -> int | None:
+        """Resolve an explicit chunk size or the engine's declared default."""
+        if chunk_size is not None:
+            return chunk_size
+
+        default = getattr(engine, "MAX_CHUNK_CHARS", 0)
+        if isinstance(default, bool) or not isinstance(default, int) or default <= 0:
+            return None
+        return default
+
+    def _generate_engine_audio(
+        self,
+        text: str,
+        language: str,
+        chunk_size: int | None,
+        **kwargs,
+    ) -> tuple[np.ndarray, int]:
+        """Call the engine with the effective chunking contract."""
+        if chunk_size is None:
+            return self.engine.generate(text=text, language=language, **kwargs)
+        return self.engine.generate(text=text, language=language, chunk_size=chunk_size, **kwargs)
+
     def generate(
         self,
         text: str,
@@ -190,7 +213,8 @@ class VoiceCloner:
         """Synthesize text, save the WAV file, and return its path.
 
         This convenience API always saves the generated audio and never plays
-        it. Chunking uses the same controls as :meth:`say`.
+        it. Chunking uses the same controls as :meth:`say`; when ``chunk_size``
+        is omitted, the configured engine's ``MAX_CHUNK_CHARS`` is used.
         """
         output_path = self.say(
             text,
@@ -226,11 +250,13 @@ class VoiceCloner:
             play_audio: Whether to play the audio.
             save_audio: Whether to save to file.
             output_file: Output file path (auto-generated if not provided).
-            chunk_size: Maximum characters per synthesis chunk. When None (the
-                default), or when the text is not longer than ``chunk_size``,
-                the text is synthesized in a single engine call exactly as
-                before. Otherwise the text is split on sentence boundaries and
-                each chunk is synthesized separately.
+            chunk_size: Maximum characters per synthesis chunk. When omitted,
+                the engine's positive ``MAX_CHUNK_CHARS`` default is used. A
+                value of ``0`` on the base class means no automatic limit. An
+                explicit value overrides the engine default for this call. When
+                the text is not longer than the effective limit, it is sent in
+                a single engine call; otherwise it is split on sentence
+                boundaries and each chunk is synthesized separately.
             silence_duration: Silence inserted between consecutive chunks, in
                 **milliseconds** (default 200). Only takes effect on the
                 chunked path; 0 inserts no silence.
@@ -241,6 +267,7 @@ class VoiceCloner:
             otherwise None.
         """
         self._validate_chunking_parameters(chunk_size, silence_duration)
+        effective_chunk_size = self._resolve_chunk_size(self.engine, chunk_size)
         logger.info(f"Generating speech for: '{text_to_voice[:50]}...' [{language}]")
 
         # Determine output file
@@ -255,18 +282,23 @@ class VoiceCloner:
         with console.status(f"[bold cyan]Generating audio with {self.engine.name}...[/bold cyan]"):
             try:
                 # Generate audio using the engine. Only engage the chunked path
-                # when the text is actually longer than the requested chunk
-                # size, so short texts reach the engine unmodified.
-                if chunk_size is not None and len(text_to_voice) > chunk_size:
+                # when the text is actually longer than the effective limit, so
+                # short texts reach the engine unmodified.
+                if effective_chunk_size is not None and len(text_to_voice) > effective_chunk_size:
                     audio_data, sample_rate = self._synthesize_chunked(
                         text_to_voice,
-                        chunk_size=chunk_size,
+                        chunk_size=effective_chunk_size,
                         silence_duration=silence_duration,
                         language=language,
                         **kwargs,
                     )
                 else:
-                    audio_data, sample_rate = self.engine.generate(text=text_to_voice, language=language, **kwargs)
+                    audio_data, sample_rate = self._generate_engine_audio(
+                        text_to_voice,
+                        language=language,
+                        chunk_size=effective_chunk_size,
+                        **kwargs,
+                    )
 
                 # Save if requested
                 if save_audio and output_file:
@@ -312,14 +344,19 @@ class VoiceCloner:
         if not chunks:
             # Empty or whitespace-only text: fall back to a single engine call
             # so the caller still gets a defined (audio, sample_rate) pair.
-            return self.engine.generate(text=text, language=language, **kwargs)
+            return self._generate_engine_audio(text, language, chunk_size, **kwargs)
 
         logger.info(f"Synthesizing {len(chunks)} chunks (chunk_size={chunk_size})")
 
         audio_chunks: list[np.ndarray] = []
         sample_rate: int | None = None
         for index, chunk in enumerate(chunks):
-            chunk_audio, chunk_rate = self.engine.generate(text=chunk, language=language, **kwargs)
+            chunk_audio, chunk_rate = self._generate_engine_audio(
+                chunk,
+                language=language,
+                chunk_size=chunk_size,
+                **kwargs,
+            )
             chunk_audio = np.asarray(chunk_audio)
             if chunk_audio.ndim == 0:
                 raise ValueError(f"Engine returned scalar audio for chunk {index}; expected an array of samples.")

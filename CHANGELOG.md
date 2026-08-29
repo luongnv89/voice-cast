@@ -17,6 +17,10 @@
   unmodified text. `say()` returns the path to the written WAV file when
   `save_audio=True`, and `None` otherwise; `generate()` always saves and
   returns the final WAV path (#127, #128, #129).
+- Engine-specific `MAX_CHUNK_CHARS` defaults are now applied automatically by
+  `VoiceCloner` and can be overridden per synthesis call with `chunk_size`;
+  the effective limit is propagated through every engine's `generate()` API
+  (#130, #131, #132).
 
 ### Fixed
 
