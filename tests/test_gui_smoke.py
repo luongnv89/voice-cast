@@ -39,6 +39,23 @@ def test_main_window_constructs_offscreen(qapp):
         window.close()
 
 
+def test_chunk_progress_becomes_determinate_and_resets(qapp):
+    """Chunk updates show a counter and each new run starts indeterminate."""
+    window = voice_cloning_app.VoiceCloningApp()
+    try:
+        window.set_chunk_progress(3, 7)
+        assert (window.progress_bar.minimum(), window.progress_bar.maximum()) == (0, 7)
+        assert window.progress_bar.value() == 2
+        assert window.progress_bar.format() == "Chunk 3 of 7"
+        assert window._stage_label.text() == "Chunk 3 of 7"
+
+        window.show_progress()
+        assert (window.progress_bar.minimum(), window.progress_bar.maximum()) == (0, 0)
+        assert window.progress_bar.value() == 0
+    finally:
+        window.close()
+
+
 def test_stage_accessible_name_tracks_current_stage(qapp):
     """Assistive technology must receive the current generation stage."""
     window = voice_cloning_app.VoiceCloningApp()

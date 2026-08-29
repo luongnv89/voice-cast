@@ -54,6 +54,78 @@ class TestVoiceClonerChunking:
         assert write.call_args.args[2] == 1000
         assert result == output_file
 
+    def test_generate_reports_each_chunk_before_engine_synthesis(self, mocked_cloner, tmp_path):
+        cloner, engine = mocked_cloner
+        chunks = ["One.", "Two.", "Three."]
+        events = []
+
+        def report(current, total):
+            events.append(("progress", current, total))
+
+        def synthesize(*, text, **_kwargs):
+            events.append(("engine", text))
+            return np.array([1.0], dtype=np.float32), 1000
+
+        engine.generate.side_effect = synthesize
+        with (
+            patch("voice_cloner.split_into_chunks", return_value=chunks),
+            patch("voice_cloner.sf.write"),
+            patch("voice_cloner.console.status") as status,
+        ):
+            cloner.generate(
+                "A long source text",
+                chunk_size=4,
+                output_file=str(tmp_path / "progress.wav"),
+                chunk_progress_callback=report,
+            )
+
+        assert events == [
+            ("progress", 1, 3),
+            ("engine", "One."),
+            ("progress", 2, 3),
+            ("engine", "Two."),
+            ("progress", 3, 3),
+            ("engine", "Three."),
+        ]
+        status.assert_not_called()
+        assert all("chunk_progress_callback" not in call.kwargs for call in engine.generate.call_args_list)
+
+    def test_generate_reports_single_short_text_as_one_chunk(self, mocked_cloner, tmp_path):
+        cloner, _engine = mocked_cloner
+        progress = MagicMock()
+
+        with patch("voice_cloner.sf.write"):
+            cloner.generate(
+                "Short text.",
+                chunk_size=100,
+                output_file=str(tmp_path / "single.wav"),
+                chunk_progress_callback=progress,
+            )
+
+        progress.assert_called_once_with(1, 1)
+
+    def test_generate_stops_progress_when_chunk_synthesis_fails(self, mocked_cloner, tmp_path):
+        cloner, engine = mocked_cloner
+        engine.generate.side_effect = [
+            (np.array([1.0], dtype=np.float32), 1000),
+            RuntimeError("synthesis failed"),
+        ]
+        progress = MagicMock()
+
+        with (
+            patch("voice_cloner.split_into_chunks", return_value=["One.", "Two.", "Three."]),
+            patch("voice_cloner.sf.write"),
+            pytest.raises(RuntimeError, match="synthesis failed"),
+        ):
+            cloner.generate(
+                "A long source text",
+                chunk_size=4,
+                output_file=str(tmp_path / "failed.wav"),
+                chunk_progress_callback=progress,
+            )
+
+        assert [item.args for item in progress.call_args_list] == [(1, 3), (2, 3)]
+
     def test_generate_keeps_short_text_on_single_engine_call(self, mocked_cloner, tmp_path):
         cloner, engine = mocked_cloner
         text = "Short text."

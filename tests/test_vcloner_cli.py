@@ -134,6 +134,69 @@ class TestCliSuccessPathsDoNotExit:
         assert cloner.generate.call_args.kwargs["chunk_size"] == 120
         assert cloner.generate.call_args.kwargs["silence_duration"] == 350
         assert cloner.generate.call_args.kwargs["play_audio"] is False
+        assert callable(cloner.generate.call_args.kwargs["chunk_progress_callback"])
+
+    def test_generation_renders_chunk_progress_and_completes_after_success(self, tmp_path):
+        cloner = MagicMock()
+        progress = MagicMock()
+        progress.add_task.return_value = 7
+        progress_context = MagicMock()
+        progress_context.__enter__.return_value = progress
+        progress_context.__exit__.return_value = False
+
+        def generate(*_args, **kwargs):
+            callback = kwargs["chunk_progress_callback"]
+            callback(1, 3)
+            callback(2, 3)
+            callback(3, 3)
+
+        cloner.generate.side_effect = generate
+        with (
+            patch("vcloner.bootstrap_engines"),
+            patch("vcloner.TTSFactory.available_engines", return_value=["coqui"]),
+            patch("vcloner.VoiceCloner", return_value=cloner),
+            patch("vcloner.Progress", return_value=progress_context),
+        ):
+            run_main(["-i", "voice.wav", "-t", "long text", "-o", str(tmp_path / "out.wav")])
+
+        progress.add_task.assert_called_once_with("Preparing chunks...", total=None)
+        updates = [(item.args, item.kwargs) for item in progress.update.call_args_list]
+        assert updates == [
+            ((7,), {"total": 3, "completed": 0, "description": "Chunk 1 of 3"}),
+            ((7,), {"total": 3, "completed": 1, "description": "Chunk 2 of 3"}),
+            ((7,), {"total": 3, "completed": 2, "description": "Chunk 3 of 3"}),
+            ((7,), {"completed": 3, "description": "Chunk 3 of 3"}),
+        ]
+
+    def test_generation_failure_does_not_mark_chunk_progress_complete(self, tmp_path):
+        cloner = MagicMock()
+        progress = MagicMock()
+        progress.add_task.return_value = 9
+        progress_context = MagicMock()
+        progress_context.__enter__.return_value = progress
+        progress_context.__exit__.return_value = False
+
+        def fail(*_args, **kwargs):
+            kwargs["chunk_progress_callback"](1, 2)
+            raise RuntimeError("boom")
+
+        cloner.generate.side_effect = fail
+        with (
+            patch("vcloner.bootstrap_engines"),
+            patch("vcloner.TTSFactory.available_engines", return_value=["coqui"]),
+            patch("vcloner.VoiceCloner", return_value=cloner),
+            patch("vcloner.Progress", return_value=progress_context),
+            pytest.raises(SystemExit) as excinfo,
+        ):
+            run_main(["-i", "voice.wav", "-t", "long text", "-o", str(tmp_path / "out.wav")])
+
+        assert excinfo.value.code == 1
+        progress.update.assert_called_once_with(
+            9,
+            total=2,
+            completed=0,
+            description="Chunk 1 of 2",
+        )
 
     def test_help_documents_chunking_options(self, capsys):
         with (

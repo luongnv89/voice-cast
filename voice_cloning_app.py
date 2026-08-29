@@ -292,13 +292,26 @@ class VoiceCloningApp(QMainWindow):
                 break
 
         # Generate button
+        generate_row = QHBoxLayout()
+        generate_row.setSpacing(SPACING.md)
+
         self.btn_generate = StyledButton("Generate Audio", variant="primary")
         self.btn_generate.setAccessibleName("Generate audio")
         self.btn_generate.setToolTip("Generate audio from the entered text and selected voice (Ctrl+G)")
         self.btn_generate.setMinimumHeight(48)
         self.btn_generate.clicked.connect(self._on_generate_clicked)
         self.btn_generate.setEnabled(False)
-        layout.addWidget(self.btn_generate)
+        generate_row.addWidget(self.btn_generate, stretch=1)
+
+        self.btn_cancel = StyledButton("Cancel", variant="ghost")
+        self.btn_cancel.setAccessibleName("Cancel generation")
+        self.btn_cancel.setToolTip("Cancel the ongoing generation (partial audio will be saved)")
+        self.btn_cancel.setMinimumHeight(48)
+        self.btn_cancel.clicked.connect(self._on_cancel_clicked)
+        self.btn_cancel.hide()
+        generate_row.addWidget(self.btn_cancel)
+
+        layout.addLayout(generate_row)
 
         # Inline hint for missing inputs
         self._generate_hint = StyledLabel(
@@ -551,11 +564,39 @@ class VoiceCloningApp(QMainWindow):
         self.engine_combo.setEnabled(True)
 
     def show_progress(self):
+        """Show a reset, indeterminate bar until chunk totals are known."""
+        self.progress_bar.setRange(0, 0)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFormat("%p%")
+        self.progress_bar.setAccessibleName("Generation progress")
         self.progress_bar.show()
 
     def hide_progress(self):
         self.progress_bar.hide()
         self._stage_label.hide()
+
+    def show_cancel(self):
+        self.btn_cancel.show()
+        self.btn_cancel.setEnabled(True)
+
+    def hide_cancel(self):
+        self.btn_cancel.hide()
+        self.btn_cancel.setEnabled(True)
+
+    def disable_cancel(self):
+        self.btn_cancel.setEnabled(False)
+
+    def enable_cancel(self):
+        self.btn_cancel.setEnabled(True)
+
+    def set_chunk_progress(self, current_chunk: int, total_chunks: int):
+        """Show determinate, accessible progress for the active chunk."""
+        label = f"Chunk {current_chunk} of {total_chunks}"
+        self.progress_bar.setRange(0, total_chunks)
+        self.progress_bar.setValue(current_chunk - 1)
+        self.progress_bar.setFormat(label)
+        self.progress_bar.setAccessibleName(f"Generation progress: {label}")
+        self.set_stage_text(label)
 
     def set_stage_text(self, text: str):
         """Set the generation stage text and accessible status."""
@@ -632,6 +673,11 @@ class VoiceCloningApp(QMainWindow):
     def _on_generate_clicked(self):
         """Start voice cloning process."""
         self._clone_flow.start()
+
+    @Slot()
+    def _on_cancel_clicked(self):
+        """Request cooperative cancellation of the ongoing generation."""
+        self._clone_flow.cancel()
 
     @Slot()
     def _on_play_clicked(self):
