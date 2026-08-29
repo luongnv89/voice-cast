@@ -79,6 +79,7 @@ class CloneThread(QThread):
     completed = Signal(str, str)
     error_occurred = Signal(str)
     stage_changed = Signal(str)
+    chunk_progress = Signal(int, int)
 
     def __init__(
         self,
@@ -157,6 +158,7 @@ class CloneThread(QThread):
             voice_cloner.generate(
                 self.text,
                 output_file=str(self.output_path),
+                chunk_progress_callback=self.chunk_progress.emit,
                 **self.engine_params,
             )
             self._record_output_ownership()
@@ -181,6 +183,7 @@ class CloneFlowController(QObject):
     """
 
     worker_finished = Signal()
+    chunk_progress = Signal(int, int)
 
     def __init__(self, ui_delegate):
         """Initialize the controller.
@@ -202,6 +205,7 @@ class CloneFlowController(QObject):
                 - enable_engine_combo()
                 - show_progress()
                 - hide_progress()
+                - set_chunk_progress(current_chunk, total_chunks)
                 - get_text_input() -> str
                 - get_voice_path() -> str | None
                 - get_engine_name() -> str
@@ -351,12 +355,22 @@ class CloneFlowController(QObject):
             thread.stage_changed,
             lambda stage, worker=thread: self._handle_stage_changed(worker, stage),
         )
+        self._connect_queued(
+            thread.chunk_progress,
+            lambda current, total, worker=thread: self._handle_chunk_progress(worker, current, total),
+        )
         self._connect_queued(thread.finished, lambda: self._on_thread_finished(thread))
 
     def _handle_stage_changed(self, thread: CloneThread, stage: str):
         """Ignore stage updates from stale or shutting-down workers."""
         if thread is self._thread and not self._shutting_down:
             self._on_stage_changed(stage)
+
+    def _handle_chunk_progress(self, thread: CloneThread, current_chunk: int, total_chunks: int):
+        """Relay progress from the current worker on the GUI thread."""
+        if thread is self._thread and not self._shutting_down:
+            self._ui.set_chunk_progress(current_chunk, total_chunks)
+            self.chunk_progress.emit(current_chunk, total_chunks)
 
     def _handle_finished(self, thread: CloneThread, output_path: str, text: str):
         """Handle completion only for the current, non-shutting-down worker."""

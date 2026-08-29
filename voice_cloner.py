@@ -3,6 +3,7 @@ import inspect
 import logging
 import os
 import warnings
+from collections.abc import Callable
 from datetime import datetime
 
 import numpy as np
@@ -39,6 +40,8 @@ _configure_transformers_logging()
 logging.basicConfig(level=logging.INFO, format="%(message)s", handlers=[RichHandler(rich_tracebacks=True)])
 logger = logging.getLogger("voice_cloner")
 console = Console()
+
+ChunkProgressCallback = Callable[[int, int], None]
 
 
 class VoiceCloner:
@@ -195,9 +198,15 @@ class VoiceCloner:
         text: str,
         language: str,
         chunk_size: int | None,
+        chunk_progress_callback: ChunkProgressCallback | None = None,
+        current_chunk: int = 1,
+        total_chunks: int = 1,
         **kwargs,
     ) -> tuple[np.ndarray, int]:
-        """Call the engine with the effective chunking contract."""
+        """Call the engine after reporting the chunk about to be synthesized."""
+        if chunk_progress_callback is not None:
+            chunk_progress_callback(current_chunk, total_chunks)
+
         if chunk_size is None:
             return self.engine.generate(text=text, language=language, **kwargs)
 
@@ -226,6 +235,7 @@ class VoiceCloner:
         silence_duration: int = 200,
         output_file: str | None = None,
         play_audio: bool = False,
+        chunk_progress_callback: ChunkProgressCallback | None = None,
         **kwargs,
     ) -> str:
         """Synthesize text, save the WAV file, and return its path.
@@ -233,7 +243,8 @@ class VoiceCloner:
         This convenience API always saves the generated audio and optionally
         plays it. Chunking uses the same controls as :meth:`say`; when
         ``chunk_size`` is omitted, the configured engine's ``MAX_CHUNK_CHARS``
-        is used.
+        is used. ``chunk_progress_callback`` receives the 1-based current chunk
+        and stable total immediately before each engine synthesis call.
         """
         output_path = self.say(
             text,
@@ -243,6 +254,7 @@ class VoiceCloner:
             output_file=output_file,
             chunk_size=chunk_size,
             silence_duration=silence_duration,
+            chunk_progress_callback=chunk_progress_callback,
             **kwargs,
         )
         if output_path is None:  # pragma: no cover - save_audio=True guarantees a path
@@ -258,6 +270,7 @@ class VoiceCloner:
         output_file: str | None = None,
         chunk_size: int | None = None,
         silence_duration: int = 200,
+        chunk_progress_callback: ChunkProgressCallback | None = None,
         **kwargs,
     ) -> str | None:
         """
@@ -279,6 +292,10 @@ class VoiceCloner:
             silence_duration: Silence inserted between consecutive chunks, in
                 **milliseconds** (default 200). Only takes effect on the
                 chunked path; 0 inserts no silence.
+            chunk_progress_callback: Optional callback receiving
+                ``(current_chunk, total_chunks)`` immediately before each
+                engine synthesis call. Chunk numbers are 1-based and the total
+                is known and stable before the first callback.
             **kwargs: Engine-specific parameters (e.g., cfg_weight for Chatterbox).
 
         Returns:
@@ -298,7 +315,12 @@ class VoiceCloner:
             output_dir = os.path.dirname(output_file) or "."
             os.makedirs(output_dir, exist_ok=True)
 
-        with console.status(f"[bold cyan]Generating audio with {self.engine.name}...[/bold cyan]"):
+        status = (
+            contextlib.nullcontext()
+            if chunk_progress_callback is not None
+            else console.status(f"[bold cyan]Generating audio with {self.engine.name}...[/bold cyan]")
+        )
+        with status:
             try:
                 # Generate audio using the engine. Only engage the chunked path
                 # when the text is actually longer than the effective limit, so
@@ -309,6 +331,7 @@ class VoiceCloner:
                         chunk_size=effective_chunk_size,
                         silence_duration=silence_duration,
                         language=language,
+                        chunk_progress_callback=chunk_progress_callback,
                         **kwargs,
                     )
                 else:
@@ -316,6 +339,7 @@ class VoiceCloner:
                         text_to_voice,
                         language=language,
                         chunk_size=effective_chunk_size,
+                        chunk_progress_callback=chunk_progress_callback,
                         **kwargs,
                     )
 
@@ -340,6 +364,7 @@ class VoiceCloner:
         chunk_size: int,
         silence_duration: int,
         language: str,
+        chunk_progress_callback: ChunkProgressCallback | None = None,
         **kwargs,
     ):
         """
@@ -350,6 +375,7 @@ class VoiceCloner:
             chunk_size: Maximum characters per chunk.
             silence_duration: Silence between consecutive chunks, in milliseconds.
             language: Language code passed to the engine.
+            chunk_progress_callback: Optional callback for pre-chunk progress.
             **kwargs: Engine-specific parameters.
 
         Returns:
@@ -363,17 +389,27 @@ class VoiceCloner:
         if not chunks:
             # Empty or whitespace-only text: fall back to a single engine call
             # so the caller still gets a defined (audio, sample_rate) pair.
-            return self._generate_engine_audio(text, language, chunk_size, **kwargs)
+            return self._generate_engine_audio(
+                text,
+                language,
+                chunk_size,
+                chunk_progress_callback=chunk_progress_callback,
+                **kwargs,
+            )
 
         logger.info(f"Synthesizing {len(chunks)} chunks (chunk_size={chunk_size})")
 
         audio_chunks: list[np.ndarray] = []
         sample_rate: int | None = None
+        total_chunks = len(chunks)
         for index, chunk in enumerate(chunks):
             chunk_audio, chunk_rate = self._generate_engine_audio(
                 chunk,
                 language=language,
                 chunk_size=chunk_size,
+                chunk_progress_callback=chunk_progress_callback,
+                current_chunk=index + 1,
+                total_chunks=total_chunks,
                 **kwargs,
             )
             chunk_audio = np.asarray(chunk_audio)

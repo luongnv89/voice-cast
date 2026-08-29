@@ -5,7 +5,15 @@ import sys
 
 from rich.console import Console
 from rich.logging import RichHandler
-from rich.progress import BarColumn, DownloadColumn, Progress, SpinnerColumn, TextColumn, TransferSpeedColumn
+from rich.progress import (
+    BarColumn,
+    DownloadColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeRemainingColumn,
+    TransferSpeedColumn,
+)
 from rich.table import Table
 
 from models import DownloadProgress, ModelDownloader, get_registry
@@ -286,14 +294,40 @@ Examples:
         cloner = VoiceCloner(speaker_wav=args.input_voice, engine=selected_engine, auto_download=False)
 
         logger.info("[bold green]Generating speech...[/bold green]")
-        cloner.generate(
-            args.text,
-            play_audio=not args.no_play,
-            output_file=args.output_file,
-            chunk_size=args.chunk_size,
-            silence_duration=args.silence_duration,
-            **engine_kwargs,
-        )
+        with Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TimeRemainingColumn(),
+            console=console,
+        ) as progress:
+            task = progress.add_task("Preparing chunks...", total=None)
+            total_chunks = None
+
+            def update_chunk_progress(current_chunk: int, total: int):
+                nonlocal total_chunks
+                total_chunks = total
+                progress.update(
+                    task,
+                    total=total,
+                    completed=current_chunk - 1,
+                    description=f"Chunk {current_chunk} of {total}",
+                )
+
+            cloner.generate(
+                args.text,
+                play_audio=not args.no_play,
+                output_file=args.output_file,
+                chunk_size=args.chunk_size,
+                silence_duration=args.silence_duration,
+                chunk_progress_callback=update_chunk_progress,
+                **engine_kwargs,
+            )
+            if total_chunks is not None:
+                progress.update(
+                    task,
+                    completed=total_chunks,
+                    description=f"Chunk {total_chunks} of {total_chunks}",
+                )
 
         logger.info(f"[bold green]Speech saved to:[/bold green] {args.output_file}")
 

@@ -137,6 +137,7 @@ generate(
     chunk_size: int | None = None,
     silence_duration: int = 200,
     output_file: str | None = None,
+    chunk_progress_callback: Callable[[int, int], None] | None = None,
     **kwargs
 ) -> str
 ```
@@ -154,6 +155,12 @@ the engine default for that call. `silence_duration` must be a
 non-negative integer in milliseconds. Text at or below the effective limit is
 sent to the engine once without modification.
 
+When `chunk_progress_callback` is provided, it receives
+`(current_chunk, total_chunks)` immediately before every engine synthesis call.
+Chunk numbers are 1-based, the total is stable from the first callback, and a
+single-call synthesis reports `(1, 1)`. The callback is never forwarded to the
+engine.
+
 ---
 
 #### `say()`
@@ -168,6 +175,7 @@ say(
     speed: float = 1.0,
     chunk_size: int | None = None,
     silence_duration: int = 200,
+    chunk_progress_callback: Callable[[int, int], None] | None = None,
     **kwargs
 ) -> str | None
 ```
@@ -186,6 +194,7 @@ Convert text to speech using the configured engine.
 | `speed` | `float` | `1.0` | Playback speed multiplier |
 | `chunk_size` | `int \| None` | `None` | Maximum characters per synthesis chunk. `None` uses the engine's `MAX_CHUNK_CHARS`; a positive value overrides it for this call |
 | `silence_duration` | `int` | `200` | Silence between consecutive chunks, in **milliseconds**. Chunked path only; `0` inserts no silence; negative values are rejected |
+| `chunk_progress_callback` | `Callable[[int, int], None] \| None` | `None` | Called with the 1-based current chunk and stable total immediately before each engine synthesis call |
 | `**kwargs` | `dict` | `{}` | Engine-specific parameters |
 
 **Returns:** the path to the written WAV file when `save_audio=True`, otherwise `None`.

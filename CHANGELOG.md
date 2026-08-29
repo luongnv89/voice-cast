@@ -24,6 +24,9 @@
 - GUI engine controls now expose the silence between text chunks, and the CLI
   accepts `--silence-duration` and `--chunk-size` overrides while preserving
   each engine's default chunk limit (#139, #142).
+- Chunk synthesis now exposes one pre-chunk progress callback consumed by the
+  GUI's determinate `Chunk X of Y` display and the CLI's Rich progress bar with
+  ETA (#136, #137, #140).
 
 ### Fixed
 

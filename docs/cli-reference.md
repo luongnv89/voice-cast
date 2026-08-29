@@ -202,7 +202,8 @@ python vcloner.py \
 
 `--chunk-size` must be greater than zero. `--silence-duration` is measured in
 milliseconds and may be zero. Omitting `--chunk-size` preserves the selected
-engine's built-in limit.
+engine's built-in limit. During synthesis, the CLI shows a determinate Rich
+progress bar with `Chunk X of Y` and an ETA calculated from completed chunks.
 
 ### Generate Without Playback
 

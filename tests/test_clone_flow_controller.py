@@ -29,6 +29,7 @@ class _UiDelegate:
         self.info_message = None
         self.info_thread_id = None
         self.stage_thread_id = None
+        self.chunk_progress_calls = []
 
     def enable_generate(self):
         pass
@@ -51,6 +52,9 @@ class _UiDelegate:
     def set_stage_text(self, _stage):
         self.stage_thread_id = threading.get_ident()
 
+    def set_chunk_progress(self, current, total):
+        self.chunk_progress_calls.append((current, total))
+
     def info(self, _title, message):
         self.info_calls += 1
         self.info_message = message
@@ -64,6 +68,9 @@ class _VoiceCloner:
 
     def generate(self, *args, **kwargs):
         self.calls.append((args, kwargs))
+        callback = kwargs.get("chunk_progress_callback")
+        if callback is not None:
+            callback(1, 1)
 
 
 def test_clone_thread_forwards_chunking_parameters(tmp_path, monkeypatch):
@@ -81,6 +88,33 @@ def test_clone_thread_forwards_chunking_parameters(tmp_path, monkeypatch):
 
     assert cloner.calls[0][1]["chunk_size"] == 120
     assert cloner.calls[0][1]["silence_duration"] == 350
+    assert callable(cloner.calls[0][1]["chunk_progress_callback"])
+
+
+def test_clone_thread_emits_core_chunk_progress(tmp_path, monkeypatch):
+    monkeypatch.setattr(clone_flow_controller.tempfile, "gettempdir", lambda: str(tmp_path))
+    worker = CloneThread("hello", "voice.wav", "test", {}, _VoiceCloner())
+    progress = []
+    worker.chunk_progress.connect(lambda current, total: progress.append((current, total)))
+
+    worker.run()
+
+    assert progress == [(1, 1)]
+
+
+def test_controller_relays_current_worker_progress(qapp):
+    event_loop = QEventLoop()
+    ui = _UiDelegate(event_loop)
+    controller = CloneFlowController(ui)
+    worker = CloneThread("hello", "voice.wav", "test", {}, _VoiceCloner())
+    relayed = []
+    controller.chunk_progress.connect(lambda current, total: relayed.append((current, total)))
+    controller._thread = worker
+
+    controller._handle_chunk_progress(worker, 2, 4)
+
+    assert ui.chunk_progress_calls == [(2, 4)]
+    assert relayed == [(2, 4)]
 
 
 def test_clone_completion_runs_on_gui_thread(qapp):

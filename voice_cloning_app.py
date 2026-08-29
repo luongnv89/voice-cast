@@ -551,11 +551,25 @@ class VoiceCloningApp(QMainWindow):
         self.engine_combo.setEnabled(True)
 
     def show_progress(self):
+        """Show a reset, indeterminate bar until chunk totals are known."""
+        self.progress_bar.setRange(0, 0)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setFormat("%p%")
+        self.progress_bar.setAccessibleName("Generation progress")
         self.progress_bar.show()
 
     def hide_progress(self):
         self.progress_bar.hide()
         self._stage_label.hide()
+
+    def set_chunk_progress(self, current_chunk: int, total_chunks: int):
+        """Show determinate, accessible progress for the active chunk."""
+        label = f"Chunk {current_chunk} of {total_chunks}"
+        self.progress_bar.setRange(0, total_chunks)
+        self.progress_bar.setValue(current_chunk)
+        self.progress_bar.setFormat(label)
+        self.progress_bar.setAccessibleName(f"Generation progress: {label}")
+        self.set_stage_text(label)
 
     def set_stage_text(self, text: str):
         """Set the generation stage text and accessible status."""

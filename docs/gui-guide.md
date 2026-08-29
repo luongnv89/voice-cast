@@ -191,8 +191,9 @@ English (en), Spanish (es), French (fr), German (de), Italian (it), Portuguese (
 ### Long Content
 
 VoiceCast automatically uses the selected engine's chunk-size limit for long
-text. Adjust **Silence between chunks** to control pacing at chunk boundaries;
-short text is still synthesized in one call.
+text. During synthesis, the progress bar switches to determinate mode and shows
+`Chunk X of Y`. Adjust **Silence between chunks** to control pacing at chunk
+boundaries; short text is still synthesized in one call.
 
 ### Voice Matching
 
