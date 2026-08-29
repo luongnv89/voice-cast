@@ -1,11 +1,14 @@
 """Regression tests for Coqui's scoped PyTorch compatibility patch."""
 
+import io
 import sys
 import types
 from threading import Thread
 from unittest.mock import MagicMock, call
 
+import numpy as np
 import pytest
+import soundfile as sf
 
 
 def _install_fake_tts(monkeypatch, constructor):
@@ -16,6 +19,80 @@ def _install_fake_tts(monkeypatch, constructor):
 
 def _make_engine(coqui_engine, registry):
     return coqui_engine.CoquiEngine(speaker_wav="voice.wav", device="cpu", registry=registry)
+
+
+class _FakeSynthesizer:
+    output_sample_rate = 16000
+
+    def __init__(self):
+        self.paths = []
+
+    def save_wav(self, *, wav, path):
+        self.paths.append(path)
+        if not isinstance(path, io.BytesIO):
+            raise AssertionError("Coqui output must be serialized to an in-memory buffer")
+        sf.write(path, np.asarray(wav), self.output_sample_rate, format="WAV", subtype="PCM_16")
+
+
+class _FakeTTS:
+    def __init__(self):
+        self.synthesizer = _FakeSynthesizer()
+        self.tts_calls = []
+        self.tts_to_file_calls = 0
+
+    def tts(self, *, text, speaker_wav, language, gpt_cond_len, temperature):
+        self.tts_calls.append(
+            {
+                "text": text,
+                "speaker_wav": speaker_wav,
+                "language": language,
+                "gpt_cond_len": gpt_cond_len,
+                "temperature": temperature,
+            }
+        )
+        return np.array([[0.25, -0.5], [0.5, -0.25]], dtype=np.float32)
+
+    def tts_to_file(self, **_kwargs):
+        self.tts_to_file_calls += 1
+        raise AssertionError("Coqui generation must not use tts_to_file")
+
+
+class TestCoquiInMemorySynthesis:
+    def test_generate_returns_valid_audio_without_creating_a_file(self, tmp_path):
+        from engines import coqui_engine
+
+        fake_tts = _FakeTTS()
+        engine = coqui_engine.CoquiEngine(
+            speaker_wav=str(tmp_path / "voice.wav"),
+            device="cpu",
+            registry=MagicMock(),
+        )
+        engine._tts = fake_tts
+
+        audio_data, sample_rate = engine.generate(
+            "hello",
+            language="fr",
+            temperature=0.4,
+            gpt_cond_len=64,
+        )
+
+        assert fake_tts.tts_calls == [
+            {
+                "text": "hello",
+                "speaker_wav": str(tmp_path / "voice.wav"),
+                "language": "fr",
+                "gpt_cond_len": 64,
+                "temperature": 0.4,
+            }
+        ]
+        assert fake_tts.tts_to_file_calls == 0
+        assert len(fake_tts.synthesizer.paths) == 1
+        assert isinstance(fake_tts.synthesizer.paths[0], io.BytesIO)
+        assert audio_data.dtype == np.float32
+        assert audio_data.shape == (2,)
+        assert sample_rate == fake_tts.synthesizer.output_sample_rate
+        np.testing.assert_allclose(audio_data, np.array([-0.125, 0.125], dtype=np.float32), atol=1e-4)
+        assert list(tmp_path.iterdir()) == []
 
 
 class TestCoquiTorchLoadCompatibility:

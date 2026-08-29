@@ -1,6 +1,5 @@
+import io
 import logging
-import os
-import tempfile
 from contextlib import contextmanager
 from contextvars import ContextVar
 from threading import RLock
@@ -159,25 +158,23 @@ class CoquiEngine(TTSEngineBase):
         Returns:
             Tuple of (audio_data, sample_rate)
         """
-        # Create temp file for output using mkstemp for better cross-platform support
-        fd, temp_path = tempfile.mkstemp(suffix=".wav")
-        os.close(fd)  # Close file descriptor immediately
+        waveform = self.tts.tts(
+            text=text,
+            speaker_wav=self.speaker_wav,
+            language=language,
+            gpt_cond_len=gpt_cond_len,
+            temperature=temperature,
+        )
 
-        try:
-            self.tts.tts_to_file(
-                text=text,
-                speaker_wav=self.speaker_wav,
-                file_path=temp_path,
-                language=language,
-                gpt_cond_len=gpt_cond_len,
-                temperature=temperature,
-            )
-            audio_data, sample_rate = sf.read(temp_path)
-            audio_data = _ensure_mono(audio_data)
-            return audio_data.astype(np.float32), sample_rate
-        finally:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
+        # Use Coqui's WAV serializer with an in-memory path so the decoded
+        # result keeps the same format and sample rate as tts_to_file().
+        with io.BytesIO() as wav_buffer:
+            self.tts.synthesizer.save_wav(wav=waveform, path=wav_buffer)
+            wav_buffer.seek(0)
+            audio_data, sample_rate = sf.read(wav_buffer)
+
+        audio_data = _ensure_mono(audio_data)
+        return audio_data.astype(np.float32), sample_rate
 
     def get_supported_parameters(self) -> dict[str, dict[str, Any]]:
         return {

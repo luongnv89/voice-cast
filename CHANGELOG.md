@@ -24,6 +24,9 @@
 
 ### Fixed
 
+- Coqui: synthesize through `tts.tts()` and decode a WAV held in memory,
+  avoiding temporary files during chunked generation while preserving the
+  existing audio conversion path.
 - Audio8: implement the real four-session ArkTTS pipeline (codec encoder,
   slow AR, fast AR, codec decoder) with per-token KV-cache stepping, so
   `--engine audio8-onnx` actually synthesizes 44.1 kHz speech from the
