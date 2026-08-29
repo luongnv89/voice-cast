@@ -44,6 +44,9 @@ _suppress_onnx_warnings()
 class Audio8Engine(TTSEngineBase):
     """TTS engine using Audio8 ONNX model for voice cloning."""
 
+    # Conservative application-level limit for Audio8 prompts.
+    MAX_CHUNK_CHARS: int = 200
+
     SUPPORTED_LANGUAGES = ["en"]
 
     def __init__(
@@ -292,6 +295,7 @@ class Audio8Engine(TTSEngineBase):
         text: str,
         language: str = "en",
         speed: float = 1.0,
+        chunk_size: int | None = None,
         **kwargs,
     ) -> tuple[np.ndarray, int]:
         """
@@ -304,6 +308,7 @@ class Audio8Engine(TTSEngineBase):
             text: Text to synthesize.
             language: Language code (primarily "en").
             speed: Speech speed multiplier (0.5-2.0).
+            chunk_size: Effective character limit selected by VoiceCloner.
             **kwargs: Additional parameters.
 
         Returns:

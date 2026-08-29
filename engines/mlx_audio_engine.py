@@ -107,6 +107,9 @@ KOKORO_LANG_CODES = {
 class MlxAudioEngine(TTSEngineBase):
     """TTS engine using MLX Audio for Apple Silicon."""
 
+    # Shared conservative limit for the Kokoro and CSM variants.
+    MAX_CHUNK_CHARS: int = 200
+
     # Supported languages depend on variant
     KOKORO_LANGUAGES = list(KOKORO_VOICES.keys())
     CSM_LANGUAGES = ["en"]  # CSM is English-only
@@ -197,6 +200,7 @@ class MlxAudioEngine(TTSEngineBase):
         voice: str = "af_heart",
         speed: float = 1.0,
         lang_code: str | None = None,
+        chunk_size: int | None = None,
         **kwargs,
     ) -> tuple[np.ndarray, int]:
         """
@@ -208,6 +212,7 @@ class MlxAudioEngine(TTSEngineBase):
             voice: Voice preset ID for Kokoro (e.g., "af_heart").
             speed: Speech speed multiplier (0.5-2.0).
             lang_code: Kokoro language code override (a, b, j, z).
+            chunk_size: Effective character limit selected by VoiceCloner.
             **kwargs: Additional parameters.
 
         Returns:

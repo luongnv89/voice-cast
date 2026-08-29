@@ -16,6 +16,7 @@ def engine_mock():
     engine = MagicMock()
     engine.generate.return_value = (np.array([0.1, 0.2, 0.3], dtype=np.float32), 22050)
     engine.name = "mock_engine"
+    engine.MAX_CHUNK_CHARS = 0
     engine.supports_languages = ["en", "fr"]
     return engine
 

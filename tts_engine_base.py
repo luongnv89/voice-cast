@@ -6,20 +6,39 @@ import torch
 
 
 class TTSEngineBase(ABC):
-    """Abstract base class for TTS engines."""
+    """Abstract base class for TTS engines.
+
+    ``MAX_CHUNK_CHARS`` is the default maximum text length that
+    :class:`voice_cloner.VoiceCloner` sends to one synthesis call.  Concrete
+    engines should override it with a conservative, model-specific character
+    limit.  A value of ``0`` means that an engine does not declare a default;
+    callers can still opt into chunking by passing ``chunk_size`` explicitly.
+    """
+
+    MAX_CHUNK_CHARS: int = 0
 
     def __init__(self, speaker_wav: str, device: str | None = None):
         self.speaker_wav = speaker_wav
         self.device = device or self._default_device()
 
     @abstractmethod
-    def generate(self, text: str, language: str = "en", **kwargs) -> tuple[np.ndarray, int]:
+    def generate(
+        self,
+        text: str,
+        language: str = "en",
+        chunk_size: int | None = None,
+        **kwargs,
+    ) -> tuple[np.ndarray, int]:
         """
         Generate audio from text.
 
         Args:
             text: The text to convert to speech.
             language: Language code (e.g., "en", "fr", "de").
+            chunk_size: Effective character limit selected by VoiceCloner for
+                this synthesis call. The text is already chunked by the
+                caller; engines accept this value as part of the shared
+                interface.
             **kwargs: Engine-specific parameters.
 
         Returns:

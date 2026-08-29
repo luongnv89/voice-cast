@@ -57,6 +57,9 @@ def _ensure_mono(audio_data: np.ndarray) -> np.ndarray:
 class CoquiEngine(TTSEngineBase):
     """TTS engine using Coqui TTS (XTTS v2)."""
 
+    # Conservative application-level limit for XTTS v2 text prompts.
+    MAX_CHUNK_CHARS: int = 240
+
     SUPPORTED_LANGUAGES = [
         "en",
         "es",
@@ -135,7 +138,13 @@ class CoquiEngine(TTSEngineBase):
         return registry.is_installed(COQUI_MODEL_ID)
 
     def generate(
-        self, text: str, language: str = "en", temperature: float = 0.7, gpt_cond_len: int = 128, **kwargs
+        self,
+        text: str,
+        language: str = "en",
+        temperature: float = 0.7,
+        gpt_cond_len: int = 128,
+        chunk_size: int | None = None,
+        **kwargs,
     ) -> tuple[np.ndarray, int]:
         """
         Generate audio using Coqui TTS.
@@ -145,6 +154,7 @@ class CoquiEngine(TTSEngineBase):
             language: Language code.
             temperature: Sampling temperature (0.1-1.0).
             gpt_cond_len: GPT conditioning length.
+            chunk_size: Effective character limit selected by VoiceCloner.
 
         Returns:
             Tuple of (audio_data, sample_rate)
