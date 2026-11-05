@@ -30,6 +30,9 @@
 
 ### Fixed
 
+- Load the native audio playback backend only when playback is requested, so
+  CLI startup and file-only generation work without PortAudio (#155).
+
 - Coqui: synthesize through `tts.tts()` and decode a WAV held in memory,
   avoiding temporary files during chunked generation while preserving the
   existing audio conversion path.

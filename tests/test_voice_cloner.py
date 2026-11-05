@@ -1,5 +1,6 @@
 """Tests for VoiceCloner."""
 
+import builtins
 import os
 from unittest.mock import MagicMock, patch
 
@@ -28,6 +29,21 @@ def cloner(engine_mock):
         patch("voice_cloner.TTSFactory.get_engine_metadata", return_value={"requires_reference_audio": False}),
     ):
         return VoiceCloner(speaker_wav="dummy.wav", device="cpu", engine="coqui")
+
+
+@pytest.fixture
+def sounddevice_mock(monkeypatch):
+    """Supply playback functions without loading a native audio driver."""
+    backend = MagicMock()
+    original_import = builtins.__import__
+
+    def import_backend(name, *args, **kwargs):
+        if name == "sounddevice":
+            return backend
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", import_backend)
+    return backend
 
 
 class TestInit:
@@ -113,10 +129,22 @@ class TestSay:
             cloner.say("test", play_audio=False, save_audio=True, output_file=out)
             write.assert_called_once_with(out, arr, 44100)
 
-    def test_playback_calls_sounddevice(self, cloner):
-        with patch("voice_cloner.sd.play") as play, patch("voice_cloner.sd.wait"):
-            cloner.say("hello", play_audio=True, save_audio=False)
-            play.assert_called_once()
+    def test_playback_calls_sounddevice(self, cloner, sounddevice_mock):
+        cloner.say("hello", play_audio=True, save_audio=False)
+        sounddevice_mock.play.assert_called_once()
+        sounddevice_mock.wait.assert_called_once()
+
+    def test_unavailable_playback_logs_error(self, cloner, monkeypatch, caplog):
+        original_import = builtins.__import__
+
+        def unavailable_backend(name, *args, **kwargs):
+            if name == "sounddevice":
+                raise OSError("PortAudio library not found")
+            return original_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", unavailable_backend)
+        cloner.say("hello", play_audio=True, save_audio=False)
+        assert "Error playing audio: PortAudio library not found" in caplog.text
 
     def test_unsupported_language(self, cloner):
         cloner.engine.generate.side_effect = ValueError("unsupported")
@@ -132,15 +160,12 @@ class TestSay:
 class TestGenerate:
     """VoiceCloner.generate() convenience API tests."""
 
-    def test_optional_playback_preserves_cli_behavior(self, cloner, tmp_path):
+    def test_optional_playback_preserves_cli_behavior(self, cloner, tmp_path, sounddevice_mock):
         out = str(tmp_path / "speech.wav")
-        with (
-            patch("voice_cloner.sf.write"),
-            patch("voice_cloner.sd.play") as play,
-            patch("voice_cloner.sd.wait"),
-        ):
+        with patch("voice_cloner.sf.write"):
             assert cloner.generate("hello", output_file=out, play_audio=True) == out
-        play.assert_called_once()
+        sounddevice_mock.play.assert_called_once()
+        sounddevice_mock.wait.assert_called_once()
 
 
 class TestSavedAudioReadback:
@@ -393,9 +418,9 @@ class TestSayChunked:
             )
         assert result == out
 
-    def test_returns_none_on_play_only_path(self, cloner):
+    def test_returns_none_on_play_only_path(self, cloner, sounddevice_mock):
         """say() returns None when nothing is written, even with an output_file."""
-        with patch("voice_cloner.sd.play"), patch("voice_cloner.sd.wait"), patch("voice_cloner.sf.write") as write:
+        with patch("voice_cloner.sf.write") as write:
             result = cloner.say("hello", play_audio=True, save_audio=False, output_file="unwritten.wav")
         write.assert_not_called()
         assert result is None
