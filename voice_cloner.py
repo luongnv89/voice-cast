@@ -7,7 +7,6 @@ from collections.abc import Callable
 from datetime import datetime
 
 import numpy as np
-import sounddevice as sd
 import soundfile as sf
 from rich.console import Console
 from rich.logging import RichHandler
@@ -519,6 +518,9 @@ class VoiceCloner:
             sample_rate: Audio sample rate.
         """
         try:
+            # PortAudio is only needed for playback, not CLI startup or file output.
+            import sounddevice as sd
+
             sd.play(audio_data, sample_rate)
             sd.wait()
             logger.info("Audio playback finished.")

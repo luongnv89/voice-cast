@@ -95,6 +95,10 @@ Gotchas discovered during that verification:
 
 Both are installed by the CI test job (`.github/workflows/ci.yml`).
 
+PortAudio is loaded only when playback is requested. CLI startup and file-only
+generation (`play_audio=False`) do not require an audio device or PortAudio.
+Explicit playback still requires a working native audio backend.
+
 ### Engine dependencies
 
 - The shared install does not include PyTorch or Transformers.
